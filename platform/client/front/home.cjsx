@@ -14,12 +14,13 @@ Templates.Home = React.createClass
 				<li>Bootstrap</li>
 				<li>Constants</li>
 				<li>SASS</li>
-				<li>Utilities here and there</li>
 				<li>Pre-filled settings file</li>
 				<li>Simple-Schema</li>
 				<li>Simple Security</li>
 				<li>Admin and test user created at startup</li>
 				<li>SSL</li>
+				<li>Internationalization</li>
+				<li>Utilities here and there</li>
 			</ul>
 			<h2>Pages</h2>
 			<ul>

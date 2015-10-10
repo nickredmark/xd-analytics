@@ -2,6 +2,12 @@
 	"public": {
 		"persistent_session": {
 			"default_method": "persistent"
+		},
+		"facebook": {
+			"enabled": "false"
+		},
+		"google": {
+			"enabled": "false"
 		}
 	},
 	"private": {
@@ -21,6 +27,16 @@
 			"key_path": "/path/to/key.pem",
 			"cert_path": "/path/to/cert.pem",
 			"port": 443
+		},
+		"facebook": {
+			"configured": false,
+			"appId": "XXX",
+			"appSecret": "XXX"
+		},
+		"google": {
+			"configured": false,
+			"clientId": "XXX",
+			"secret": "XXX"
 		}
 	}
 }

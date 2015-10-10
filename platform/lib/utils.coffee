@@ -15,7 +15,7 @@ Array.prototype.remove ?= (args...) ->
 # Log error to console and alert
 @handleError = (e) ->
 	console.log e
-	sAlert.error e.message
+	sAlert.error __(e.message)
 	throw e
 
 @checkError = (e) ->
@@ -34,7 +34,7 @@ Array.prototype.remove ?= (args...) ->
 				callback n
 			if successMessage
 				console.log successMessage
-				sAlert.success successMessage
+				sAlert.success __(successMessage)
 
 # Log function that handles errors
 @log = (m) ->

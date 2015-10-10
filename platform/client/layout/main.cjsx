@@ -43,24 +43,24 @@ LoginRequired = React.createClass
 		FlowRouter.go "/login?next=#{encodeURIComponent(window.location.href)}"
 	render: ->
 		<div className="container">
-			<h1 className="page-header">Log in required</h1>
-			<p>You need to log in to access this page.</p>
+			<h1 className="page-header"><T>login_required</T></h1>
+			<p><T>you_need_to_login_to_access_this_page</T></p>
 		</div>
 
 Forbidden = React.createClass
 	componentDidMount: ->
-		sAlert.error "You don't have access to this page"
+		sAlert.error __("you_dont_have_access_to_this_page")
 		FlowRouter.go "/"
 	render: ->
 		<div className="component">
-			<h1 className="page-header">Forbidden</h1>
-			<p>You don't have access to this page.</p>
+			<h1 className="page-header"><T>forbidden</T></h1>
+			<p><T>you_dont_have_access_to_this_page</T></p>
 		</div>
 
 Header = React.createClass
 	mixins: [ReactMeteorData]
 	getMeteorData: ->
-		user: Meteor.user() # Needed for the template to react to user change
+		user: Meteor.user()
 		isAdmin: Meteor.user()?.isAdmin()
 	render: ->
 		<header>
@@ -68,7 +68,7 @@ Header = React.createClass
 				<div className="container">
 					<div className="navbar-header">
 						<button type="button" data-toggle="collapse" data-target="#navbar" aria-expanded="false" className="navbar-toggle collapsed">
-							<span className="sr-only">Toggle navigation</span>
+							<span className="sr-only"><T>toggle_navigation</T></span>
 							<i className="fa fa-bars"></i>
 						</button>
 						{
@@ -85,24 +85,23 @@ Header = React.createClass
 							if @data.user
 								<ul className="nav navbar-nav navbar-right">
 									<li>
-										<a href="/">Home</a>
+										<a href="/"><T>home</T></a>
 									</li>
 									<li className="dropdown">
-										<a data-toggle="dropdown" role="button" aria-expanded="false" className="dropdown-toggle" href="#">
-											Hello, {@data.user.displayName()} <i className="fa fa-caret-down"></i>
+										<a data-toggle="dropdown" role="button" aria-expanded="false" className="dropdown-toggle" href="#"><T username={@data.user.displayName()}>hello_user</T> <i className="fa fa-caret-down"></i>
 										</a>
 										<ul role="menu" className="dropdown-menu">
 											<li>
-												<a href="/account">Account</a>
+												<a href="/account"><T>account</T></a>
 											</li>
 											{
 												if @data.isAdmin
 													<li>
-														<a href="/admin">Admin</a>
+														<a href="/admin"><T>admin</T></a>
 													</li>
 											}
 											<li>
-												<a href="/logout">Log out</a>
+												<a href="/logout"><T>logout</T></a>
 											</li>
 										</ul>
 									</li>
@@ -110,13 +109,13 @@ Header = React.createClass
 							else
 								<ul className="nav navbar-nav navbar-right">
 									<li>
-										<a href="/">Home</a>
+										<a href="/"><T>home</T></a>
 									</li>
 									<li>
-										<a href="/register">Register</a>
+										<a href="/register"><T>register</T></a>
 									</li>
 									<li>
-										<a href="/login">Log in</a>
+										<a href="/login"><T>login</T></a>
 									</li>
 								</ul>
 						}

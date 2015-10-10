@@ -1,7 +1,7 @@
 Templates.Admin = React.createClass
 	render: ->
 		<div className="container">
-			<h1>Admin</h1>
+			<h1><T>admin</T></h1>
 			<AdminUsersContainer/>
 		</div>
 

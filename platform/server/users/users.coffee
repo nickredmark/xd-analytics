@@ -10,6 +10,22 @@ Accounts.onCreateUser (options, user) ->
 	user
 
 Meteor.startup ->
+
+	facebook = Meteor.settings.private.facebook
+	if (ServiceConfiguration.configurations.find({service: 'facebook'}).count() is 0) and facebook?.configured
+	  ServiceConfiguration.configurations.insert
+	    service: "facebook"
+	    appId: facebook.appId
+	    secret: facebook.appSecret
+
+	google = Meteor.settings.private.google
+	if (ServiceConfiguration.configurations.find({service: 'google'}).count() is 0) and google?.configured
+		ServiceConfiguration.configurations.insert
+			service: "google"
+			clientId: google.clientId
+			loginStyle: "popup"
+			secret: google.secret
+
 	if Meteor.users.find().count() is 0
 		admin = Meteor.settings.private.admin
 		id = Accounts.createUser

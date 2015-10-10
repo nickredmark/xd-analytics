@@ -52,12 +52,22 @@ reload
 ejson
 check
 
+# Social
+accounts-facebook
+accounts-google
+tanis:bootstrap-social
+
 # Application specific stuff
 d3js:d3
 pascoual:pdfjs
 pascoual:bootstrap-contextmenu
+
+# More
 oembed:jquery-oembed-all
 kadira:flow-router
 kadira:react-layout
 meteorhacks:fast-render
 nicolaslopezj:roles
+service-configuration
+force-ssl
+universe:i18n

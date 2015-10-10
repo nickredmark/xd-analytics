@@ -5,6 +5,6 @@ Meteor.startup ->
 	Accounts.emailTemplates.from = "#{Constants.name} <#{Constants.email}>"
 	Accounts.emailTemplates.siteName = Constants.name
 	Accounts.emailTemplates.verifyEmail.subject = (user) ->
-		'Confirm your email address'
+		__("email", "verify_email_subject")
 	Accounts.emailTemplates.verifyEmail.text = (user, url) ->
-		"Click on the following link to confirm: #{url}"
+		__("email", "verify_email_text", [url])
