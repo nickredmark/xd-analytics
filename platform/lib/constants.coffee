@@ -1,8 +1,8 @@
 Meteor.startup ->
 
-	if not Meteor.settings
+	if not Meteor.settings.private
 		throw new Error "No settings file set."
-	
+
 	@Constants =
 		name: "Boilerplate"
 		title: "Boilerplate"
