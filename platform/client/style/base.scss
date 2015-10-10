@@ -1,0 +1,22 @@
+#app {
+	display: flex;
+	min-height: 100vh;
+	flex-direction: column;
+}
+
+#footer {
+	background-color: #222;
+	height: 60px;
+
+	p {
+		margin: 20px 0px;
+	}
+}
+
+main {
+	flex: 1;
+}
+
+a, label {
+	cursor: pointer;
+}

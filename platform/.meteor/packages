@@ -1,0 +1,63 @@
+# Meteor packages used by this project, one per line.
+# Check this file (and the other files in this directory) into your repository.
+#
+# 'meteor add' and 'meteor remove' will edit this file for you,
+# but you can also edit it by hand.
+
+meteor-base             # Packages every Meteor app needs to have
+mobile-experience       # Packages for a great mobile UX
+mongo                   # The database Meteor supports right now
+blaze-html-templates    # Compile .html files into Meteor Blaze views
+session                 # Client-side reactive dictionary for your app
+jquery                  # Helpful client-side library
+tracker                 # Meteor's client-side reactive programming library
+
+standard-minifiers      # JS/CSS minifiers run for production mode
+es5-shim                # ECMAScript 5 compatibility for older browsers.
+ecmascript              # Enable ECMAScript2015+ syntax in app code
+
+accounts-password
+#alanning:roles
+aldeed:collection2
+coffeescript
+dburles:collection-helpers
+email
+fortawesome:fontawesome
+http
+jhartma:cjsx
+juliancwirko:s-alert
+matb33:collection-hooks
+meteorhacks:ssr
+mizzao:jquery-ui
+momentjs:moment
+mquandalle:jade
+#msavin:mongol
+ongoworks:security
+random
+react
+react-meteor-data
+react-template-helper
+simple:reactive-method
+twbs:bootstrap
+u2622:persistent-session
+vsivsi:file-collection
+benjaminrh:jquery-cookie
+mrt:jquery-mousewheel
+mquandalle:bower
+reactive-dict
+reactive-var
+steeve:jquery-qrcode
+fourseven:scss@=3.2.0
+reload
+ejson
+check
+
+# Application specific stuff
+d3js:d3
+pascoual:pdfjs
+pascoual:bootstrap-contextmenu
+oembed:jquery-oembed-all
+kadira:flow-router
+kadira:react-layout
+meteorhacks:fast-render
+nicolaslopezj:roles

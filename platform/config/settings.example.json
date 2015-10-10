@@ -1,0 +1,26 @@
+{
+	"public": {
+		"persistent_session": {
+			"default_method": "persistent"
+		}
+	},
+	"private": {
+		"smtp": {
+			"username": "username",
+			"password": "XXXX",
+			"server": "smtp.mandrillapp.com",
+			"port": "587"
+		},
+		"admin": {
+			"username": "admin",
+			"email": "admin@example.com",
+			"password": "secret"
+		},
+		"ssl": {
+			"enabled": false,
+			"key_path": "/path/to/key.pem",
+			"cert_path": "/path/to/cert.pem",
+			"port": 443
+		}
+	}
+}
