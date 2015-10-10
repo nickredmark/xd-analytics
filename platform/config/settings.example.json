@@ -4,10 +4,10 @@
 			"default_method": "persistent"
 		},
 		"facebook": {
-			"enabled": "false"
+			"enabled": false
 		},
 		"google": {
-			"enabled": "false"
+			"enabled": false
 		}
 	},
 	"private": {

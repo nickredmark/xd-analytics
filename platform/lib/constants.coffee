@@ -1,6 +1,6 @@
 Meteor.startup ->
 
-	if not Meteor.settings.private
+	if Meteor.isServer and not Meteor.settings.private
 		throw new Error "No settings file set."
 
 	@Constants =

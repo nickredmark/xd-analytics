@@ -6,9 +6,11 @@ If I have to create a new website, I start with this.
 
 Meteor is in the `platform` folder.
 
-Rename `settings.example.json` to `settings.json` and adapt.
+1. Rename `settings.example.json` to `settings.json` and adapt.
 
-Adapt the `lib/constants.coffee` file.
+2. Adapt the `lib/constants.coffee` file.
+
+3. Start meteor
 
     meteor --settings config/local.settings.json
 
