@@ -82,3 +82,6 @@ force-ssl
 universe:i18n
 
 # More
+emdagon:c3js
+fermuch:metrics-graphics
+rajit:bootstrap3-datepicker
