@@ -1,0 +1,79 @@
+#devicesGraph {
+	overflow: hidden;
+	position: relative;
+	border: 1px solid lightgrey;
+	margin-bottom: 20px;
+}
+
+.node {
+	border: 1px solid #5074C1;
+	border-radius: 5px;
+	position: absolute;
+	background-color: #b4c7ff;
+	padding: 2px;
+	z-index: 10;
+}
+
+.browser {
+	width: 100%;
+	height: 100%;
+	background-size: contain;
+	background-repeat: no-repeat;
+	background-position: center;
+}
+
+.browser.Chrome {
+	background-image: url('/img/chrome.png');
+}
+
+.browser.Safari {
+	background-image: url('/img/safari.png');
+}
+
+.browser.Firefox {
+	background-image: url('/img/firefox.png');
+}
+
+.browser.Explorer {
+	background-image: url('/img/explorer.png');
+}
+
+.link {
+	position: absolute;
+	height: 0px;
+	border: 1px solid lightblue;
+}
+
+#timeline-wrapper {
+	width: 100%;
+	overflow: hidden;
+}
+
+#timeline {
+	width: 100%;
+	height: 400px;
+}
+
+.roles {
+	margin-bottom: 10px;
+	ul {
+		list-style-type: none;
+		padding: 0px;
+
+		li {
+			float: left;
+			margin-right: 5px;
+			margin-left: 5px;
+			padding-left: 10px;
+			padding-right: 10px;
+			border-radius: 5px;
+			color: #337ab7;
+
+			a {
+				color: inherit;
+				text-decoration: none;
+			}
+		}
+	}
+
+}
