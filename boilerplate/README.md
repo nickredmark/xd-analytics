@@ -1,6 +1,6 @@
 # Nick's Boilerplate
 
-If I have to create a new website, I start with this.
+If I have to create a new website, I start with this repository.
 
 ## Configure and start meteor
 
@@ -21,3 +21,6 @@ Meteor is in the `platform` folder.
 * less -> sass
 * SQL
 * internationalization
+
+Nicola Marcacci Rossi
+nmr.io
