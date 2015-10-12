@@ -77,8 +77,6 @@ momentjs:moment@2.10.6
 mongo@1.1.2
 mongo-id@1.0.1
 mquandalle:bower@1.5.2
-mquandalle:jade@0.4.4
-mquandalle:jade-compiler@0.4.4
 mrt:jquery-mousewheel@0.1.0
 nicolaslopezj:roles@1.5.2
 npm-bcrypt@0.7.8_2
