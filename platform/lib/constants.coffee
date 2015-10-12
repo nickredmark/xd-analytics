@@ -13,3 +13,5 @@ Meteor.startup ->
 			email: "john@example.com"
 			url: "http://www.example.com"
 		startYear: 2015
+		redirectAfterLogin: "/"
+		redirectAfterRegister: "/"

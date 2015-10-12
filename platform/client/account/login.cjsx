@@ -2,14 +2,19 @@
 Templates.Login = React.createClass
 	mixins: [ReactUtils, ReactMeteorData]
 	getMeteorData: ->
+		user = Meteor.user()
+		if user
+			if @props.next
+				FlowRouter.go @props.next
+			else
+				FlowRouter.go Constants.redirectAfterLogin
 		user: Meteor.user()
 	getInitialState: ->
 		username: ""
 		password: ""
 	login: (e) ->
 		e.preventDefault();
-		Meteor.loginWithPassword @state.username, @state.password, handleResult "logged_in", ->
-			FlowRouter.go "home"
+		Meteor.loginWithPassword @state.username, @state.password, handleResult "logged_in"
 	facebook: (e) ->
 		Meteor.loginWithFacebook
 			requestPermissions: ['email']
@@ -23,6 +28,11 @@ Templates.Login = React.createClass
 		Accounts.forgotPassword
 			emails: @state.email
 		, handleResult "reset_email_sent"
+	registerUrl: ->
+		if @props.next
+			"/register?next=#{encodeURIComponent(@props.next)}"
+		else
+			"/register"
 	render: ->
 		<div className="container login">
 			<div className="col-ms-offset-2 col-ms-8 col-sm-offset-3 col-sm-6 col-md-offset-4 col-md-4">
@@ -84,7 +94,7 @@ Templates.Login = React.createClass
 										</div>
 								}
 								<div className="form-group">
-									<small><T>no_account</T> <a href="/register"><T>register</T></a>.</small>
+									<small><T>no_account</T> <a href={@registerUrl()}><T>register</T></a>.</small>
 								</div>
 							</form>
 				}
