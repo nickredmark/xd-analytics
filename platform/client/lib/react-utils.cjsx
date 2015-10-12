@@ -34,7 +34,7 @@
 		self = @
 		(e) ->
 			set = {}
-			set[dictName] = @state[dictName]
+			set[dictName] = self.state[dictName]
 			set[dictName][key] = e.target.value
 			self.setState set
 	updateBoolean: (name) ->
@@ -45,4 +45,24 @@
 				set[name] = true
 			else
 				set[name] = false
+			self.setState set
+	addItem: (listName, newElementName) ->
+		self = @
+		(e) ->
+			e.preventDefault()
+			if self.state[newElementName]
+				list = self.state[listName]
+				list.push self.state[newElementName]
+				set = {}
+				set[listName] = list
+				set[newElementName] = ""
+				self.setState set
+	removeItem: (listName, i) ->
+		self = @
+		(e) ->
+			e.preventDefault()
+			list = self.state[listName]
+			list.splice(i, 1)
+			set = {}
+			set[listName] = list
 			self.setState set
