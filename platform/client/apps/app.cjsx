@@ -24,135 +24,137 @@ Templates.App = React.createClass
 		logs: logs
 		devices: devices
 	render: ->
-		<div className="row">
-			{
-				if @data.ready
-					if @data.app
-						<div>
-							<div className="col-xs-12">
-								<h1>{@data.app.name}</h1>
-								<p>{@data.app.description}</p>
-							</div>
-							<div className="col-xs-12 col-sm-6">
-								<h2>App data</h2>
-								<div>
-									<label>App ID:&nbsp;</label>
-									{@data.app._id}
+		<article className="container">
+			<div className="row">
+				{
+					if @data.ready
+						if @data.app
+							<div>
+								<div className="col-xs-12">
+									<h1>{@data.app.name}</h1>
+									<p>{@data.app.description}</p>
 								</div>
-								<div>
-									<label>API Key:&nbsp;</label>
-									{@data.app.apiKey}
+								<div className="col-xs-12 col-sm-6">
+									<h2>App data</h2>
+									<div>
+										<label>App ID:&nbsp;</label>
+										{@data.app._id}
+									</div>
+									<div>
+										<label>API Key:&nbsp;</label>
+										{@data.app.apiKey}
+									</div>
 								</div>
-							</div>
-							<div className="col-xs-12 col-sm-6">
-								<h2>Statistics</h2>
-								<div>
-									<label>Number of devices:&nbsp;</label>
-									{@data.devices.length}
+								<div className="col-xs-12 col-sm-6">
+									<h2>Statistics</h2>
+									<div>
+										<label>Number of devices:&nbsp;</label>
+										{@data.devices.length}
+									</div>
+									<div>
+										<label>Number of log entries:&nbsp;</label>
+										{@data.logs.length}
+									</div>
 								</div>
-								<div>
-									<label>Number of log entries:&nbsp;</label>
-									{@data.logs.length}
+								<div className="col-xs-12">
+									<h2>Timeline</h2>
+									<DevicesTimeline appId={@props.appId}/>
 								</div>
-							</div>
-							<div className="col-xs-12">
-								<h2>Timeline</h2>
-								<DevicesTimeline appId={@props.appId}/>
-							</div>
-							<div className="col-xs-12">
-								<h2>Devices</h2>
-								{
-									if @data.devices?.length
-										<div>
-											<DevicesGraph appId={@props.appId}/>
-											<div className="table-responsive">
-												<table className="table table-striped table-bordered table-hover">
-													<thead>
-														<th>Id</th>
-														<th>Browser</th>
-														<th>Size</th>
-														<th>Roles</th>
-														<th>Connected devices</th>
-														<th>Last updated</th>
-													</thead>
-													<tbody>
-														{
-															for device, i in @data.devices
-																<tr key={i}>
-																	<td>{device.id}</td>
-																	<td>{device.browser} {device.browserVersion}</td>
-																	<td>
-																		{
-																			if device.width? or device.height?
-																				<span>{device.width}x{device.height}</span>
-																		}
-																		{
-																			if device.minWidth != device.maxWidth or device.minHeight != device.maxHeight
-																				<span>&nbsp;({device.minWidth}-{device.maxWidth}x{device.minHeight}-{device.maxHeight})</span>
-																		}
-																	</td>
-																	<td>
-																		{
-																			if device.roles?.length
-																				<ul>
-																					{
-																						for role, i in device.roles
-																							<li key={i}>{role}</li>
-																					}
-																				</ul>
-																		}
-																	</td>
-																	<td>
-																		{
-																			if device.connectedDevices?.length
-																				<ul>
-																					{
-																						for connectedDevice, i in device.connectedDevices
-																							<li key={i}>{connectedDevice}</li>
-																					}
-																				</ul>
-																		}
-																	</td>
-																	<td>
-																		{moment(device.lastUpdatedAt).format('YYYY-MM-DD HH:mm:ss')}
-																	</td>
-																</tr>
-														}
-													</tbody>
-												</table>
+								<div className="col-xs-12">
+									<h2>Devices</h2>
+									{
+										if @data.devices?.length
+											<div>
+												<DevicesGraph appId={@props.appId}/>
+												<div className="table-responsive">
+													<table className="table table-striped table-bordered table-hover">
+														<thead>
+															<th>Id</th>
+															<th>Browser</th>
+															<th>Size</th>
+															<th>Roles</th>
+															<th>Connected devices</th>
+															<th>Last updated</th>
+														</thead>
+														<tbody>
+															{
+																for device, i in @data.devices
+																	<tr key={i}>
+																		<td>{device.id}</td>
+																		<td>{device.browser} {device.browserVersion}</td>
+																		<td>
+																			{
+																				if device.width? or device.height?
+																					<span>{device.width}x{device.height}</span>
+																			}
+																			{
+																				if device.minWidth != device.maxWidth or device.minHeight != device.maxHeight
+																					<span>&nbsp;({device.minWidth}-{device.maxWidth}x{device.minHeight}-{device.maxHeight})</span>
+																			}
+																		</td>
+																		<td>
+																			{
+																				if device.roles?.length
+																					<ul>
+																						{
+																							for role, i in device.roles
+																								<li key={i}>{role}</li>
+																						}
+																					</ul>
+																			}
+																		</td>
+																		<td>
+																			{
+																				if device.connectedDevices?.length
+																					<ul>
+																						{
+																							for connectedDevice, i in device.connectedDevices
+																								<li key={i}>{connectedDevice}</li>
+																						}
+																					</ul>
+																			}
+																		</td>
+																		<td>
+																			{moment(device.lastUpdatedAt).format('YYYY-MM-DD HH:mm:ss')}
+																		</td>
+																	</tr>
+															}
+														</tbody>
+													</table>
+												</div>
 											</div>
-										</div>
-									else
-										<p>No devices were detected for this app yet.</p>
-								}
+										else
+											<p>No devices were detected for this app yet.</p>
+									}
+								</div>
+								<div className="col-xs-12">
+									<h2>Logs</h2>
+									{
+										if @data.logs?.length
+											<Table headers={["Logged at", "Device ID", "User ID", "Type", "Comment"]}>
+												{
+													for log, i in @data.logs
+														<tr key={i}>
+															<td>{moment(log.loggedAt).format('YYYY-MM-DD HH:mm:ss:SSS')}</td>
+															<td>{log.device.id}</td>
+															<td>{log.userIdentifier}</td>
+															<td>{log.type}</td>
+															<td>{log.comment}</td>
+														</tr>
+												}
+											</Table>
+										else
+											<p>There are no logs for this app yet.</p>
+									}
+								</div>
 							</div>
-							<div className="col-xs-12">
-								<h2>Logs</h2>
-								{
-									if @data.logs?.length
-										<Table headers={["Logged at", "Device ID", "User ID", "Type", "Comment"]}>
-											{
-												for log, i in @data.logs
-													<tr key={i}>
-														<td>{moment(log.loggedAt).format('YYYY-MM-DD HH:mm:ss:SSS')}</td>
-														<td>{log.device.id}</td>
-														<td>{log.userIdentifier}</td>
-														<td>{log.type}</td>
-														<td>{log.comment}</td>
-													</tr>
-											}
-										</Table>
-									else
-										<p>There are no logs for this app yet.</p>
-								}
-							</div>
-						</div>
+						else
+							<NotFound />
 					else
-						<NotFound />
-				else
-					<Loading />
-			}
-		</div>
+						<Loading />
+				}
+			</div>
+		</article>
 
 DevicesTimeline = React.createClass
 	mixins: [ReactMeteorData, ReactUtils]
