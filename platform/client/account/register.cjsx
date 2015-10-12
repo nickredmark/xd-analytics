@@ -1,10 +1,18 @@
 Templates.Register = React.createClass
-	mixins: [ReactUtils]
+	mixins: [ReactUtils, ReactMeteorData]
 	getInitialState: ->
 		username: ""
 		email: ""
 		password: ""
 		password2: ""
+	getMeteorData: ->
+		user = Meteor.user()
+		if user
+			if @props.next
+				FlowRouter.go @props.next
+			else
+				FlowRouter.go Constants.redirectAfterRegister
+		user: Meteor.user()
 	register: (e) ->
 		e.preventDefault()
 
@@ -17,7 +25,20 @@ Templates.Register = React.createClass
 			username: @state.username
 			email: @state.email
 			password: @state.password
-		, handleResult "account_created", FlowRouter.go("/")
+		, handleResult "account_created"
+	facebook: (e) ->
+		Meteor.loginWithFacebook
+			requestPermissions: ['email']
+		, handleResult "logged_in"
+	google: (e) ->
+		Meteor.loginWithGoogle
+			requestPermissions: ['email']
+		, handleResult "logged_in"
+	loginUrl: ->
+		if @props.next
+			"/login?next=#{encodeURIComponent(@props.next)}"
+		else
+			"/login"
 	render: ->
 		<article className="container">
 			<div className="col-ms-offset-2 col-ms-8 col-sm-offset-3 col-sm-6 col-md-offset-4 col-md-4">
@@ -65,7 +86,7 @@ Templates.Register = React.createClass
 							</div>
 					}
 					<div className="form-group">
-						<small><T>already_have_account</T> <a href="/login"><T>login</T></a></small>
+						<small><T>already_have_account</T> <a href={@loginUrl()}><T>login</T></a></small>
 					</div>
 				</form>
 			</div>

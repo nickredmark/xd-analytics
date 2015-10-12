@@ -40,7 +40,7 @@ Templates.MainLayout = React.createClass
 LoginRequired = React.createClass
 	componentDidMount: ->
 		sAlert.info "Login required"
-		FlowRouter.go "/login?next=#{encodeURIComponent(window.location.href)}"
+		FlowRouter.go "/login?next=#{encodeURIComponent(FlowRouter.current().path)}"
 	render: ->
 		<div className="container">
 			<h1 className="page-header"><T>login_required</T></h1>

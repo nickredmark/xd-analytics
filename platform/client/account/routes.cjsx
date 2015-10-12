@@ -2,14 +2,14 @@ Routes.Access = FlowRouter.group
 	name: 'access'
 
 Routes.Access.route '/register',
-	action: ->
+	action: (params, queryParams) ->
 		ReactLayout.render Templates.MainLayout,
-			content: <Templates.Register/>
+			content: <Templates.Register next={queryParams.next}/>
 
 Routes.Access.route '/login',
-	action: ->
+	action: (params, queryParams)->
 		ReactLayout.render Templates.MainLayout,
-			content: <Templates.Login/>
+			content: <Templates.Login next={queryParams.next}/>
 
 Routes.Access.route '/logout',
 	action: ->
