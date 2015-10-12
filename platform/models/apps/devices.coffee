@@ -1,3 +1,4 @@
+@Logs = new Mongo.Collection "logs"
 @Devices = new Mongo.Collection "devices"
 
 Schemas.DeviceState = new SimpleSchema

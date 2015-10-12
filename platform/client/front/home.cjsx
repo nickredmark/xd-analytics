@@ -23,4 +23,6 @@ Templates.Home = React.createClass
 								<p>Already have an account? <a href="/login">Log in</a></p>
 							</div>
 					}
+				</div>
+			</div>
 		</article>

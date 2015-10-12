@@ -1,0 +1,2 @@
+@Users = Meteor.users
+@Schemas = {}

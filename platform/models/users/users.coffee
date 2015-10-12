@@ -1,5 +1,4 @@
 @Users = Meteor.users
-Schemas = {}
 
 Schemas.UserProfile = new SimpleSchema
 	name:
