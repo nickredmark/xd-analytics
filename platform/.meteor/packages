@@ -4,70 +4,81 @@
 # 'meteor add' and 'meteor remove' will edit this file for you,
 # but you can also edit it by hand.
 
+# Meteor
 meteor-base             # Packages every Meteor app needs to have
 mobile-experience       # Packages for a great mobile UX
 mongo                   # The database Meteor supports right now
-blaze-html-templates    # Compile .html files into Meteor Blaze views
 session                 # Client-side reactive dictionary for your app
-jquery                  # Helpful client-side library
 tracker                 # Meteor's client-side reactive programming library
+check
+email
+http
+random
 
+# Reactivity
+simple:reactive-method
+reactive-dict
+reactive-var
+
+# Scripting
 standard-minifiers      # JS/CSS minifiers run for production mode
 es5-shim                # ECMAScript 5 compatibility for older browsers.
 ecmascript              # Enable ECMAScript2015+ syntax in app code
-
-accounts-password
-#alanning:roles
-aldeed:collection2
 coffeescript
-dburles:collection-helpers
-email
-fortawesome:fontawesome
-http
 jhartma:cjsx
-juliancwirko:s-alert
-matb33:collection-hooks
+
+# Routing
+kadira:flow-router
+
+# Rendering
+blaze-html-templates    # Compile .html files into Meteor Blaze views
 meteorhacks:ssr
-mizzao:jquery-ui
-momentjs:moment
-mquandalle:jade
-#msavin:mongol
-ongoworks:security
-random
 react
 react-meteor-data
 react-template-helper
-simple:reactive-method
-twbs:bootstrap
-u2622:persistent-session
-vsivsi:file-collection
-benjaminrh:jquery-cookie
-mrt:jquery-mousewheel
-mquandalle:bower
-reactive-dict
-reactive-var
-steeve:jquery-qrcode
-fourseven:scss@=3.2.0
+kadira:react-layout
 reload
 ejson
-check
+meteorhacks:fast-render
 
-# Social
+# Accounts
+accounts-password
 accounts-facebook
 accounts-google
 tanis:bootstrap-social
+service-configuration
 
-# Application specific stuff
+# Collections and security
+aldeed:collection2
+dburles:collection-helpers
+matb33:collection-hooks
+ongoworks:security
+vsivsi:file-collection
+nicolaslopezj:roles
+
+# Styling
+twbs:bootstrap
+fourseven:scss
+
+# Libraries and utilities
 d3js:d3
 pascoual:pdfjs
 pascoual:bootstrap-contextmenu
+jquery                  # Helpful client-side library
+mizzao:jquery-ui
+mrt:jquery-mousewheel
+benjaminrh:jquery-cookie
+steeve:jquery-qrcode
+fortawesome:fontawesome
+juliancwirko:s-alert
+momentjs:moment
+#msavin:mongol
+u2622:persistent-session
+mquandalle:bower
+oembed:jquery-oembed-all
+force-ssl
+
+# Internationalization
+universe:i18n
 
 # More
-oembed:jquery-oembed-all
-kadira:flow-router
-kadira:react-layout
-meteorhacks:fast-render
-nicolaslopezj:roles
-service-configuration
-force-ssl
-universe:i18n
