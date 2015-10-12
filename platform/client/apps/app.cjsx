@@ -1,8 +1,4 @@
-Template.app.helpers
-	App: ->
-		AppTemplate
-
-AppTemplate = React.createClass
+Templates.App = React.createClass
 	mixins: [ReactMeteorData]
 	getMeteorData: ->
 		handle = Meteor.subscribe 'app', @props.appId
