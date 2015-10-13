@@ -1,5 +1,10 @@
 Templates.App = React.createClass
 	mixins: [ReactMeteorData]
+	views:
+		overview: "Overview"
+		timeline: "Timeline"
+		devices: "Devices"
+		logs: "Logs"
 	getMeteorData: ->
 		handle = Meteor.subscribe 'app', @props.appId
 
@@ -23,140 +28,93 @@ Templates.App = React.createClass
 		app: app
 		logs: logs
 		devices: devices
+	view: ->
+		if @props.view then @props.view else "overview"
+	viewUrl: (view) ->
+		if view is "overview"
+			"/apps/#{@props.appId}"
+		else
+			"/apps/#{@props.appId}/#{view}"
 	render: ->
 		<article className="container">
+			{
+				if @data.ready and @data.app
+					<div className="row">
+						<div className="col-xs-12">
+							<h1>{@data.app.name}</h1>
+							<p>{@data.app.description}</p>
+						</div>
+					</div>
+				else
+					<div className="row">
+						<div className="col-xs-12">
+							<h1>App view</h1>
+							<Templates.Loading />
+						</div>
+					</div>
+			}
+
 			<div className="row">
+				<div className="col-xs-12">
+					<ul className="nav nav-tabs">
+						{
+							for view, label of @views
+								<li key={view} role="presentation" className={if view is @view() then "active" else ""}><a href={@viewUrl(view)}>{label}</a></li>
+						}
+					</ul>
+				</div>
 				{
 					if @data.ready
 						if @data.app
-							<div>
-								<div className="col-xs-12">
-									<h1>{@data.app.name}</h1>
-									<p>{@data.app.description}</p>
-								</div>
-								<div className="col-xs-12 col-sm-6">
-									<h2>App data</h2>
-									<div>
-										<label>App ID:&nbsp;</label>
-										{@data.app._id}
-									</div>
-									<div>
-										<label>API Key:&nbsp;</label>
-										{@data.app.apiKey}
-									</div>
-								</div>
-								<div className="col-xs-12 col-sm-6">
-									<h2>Statistics</h2>
-									<div>
-										<label>Number of devices:&nbsp;</label>
-										{@data.devices.length}
-									</div>
-									<div>
-										<label>Number of log entries:&nbsp;</label>
-										{@data.logs.length}
-									</div>
-								</div>
-								<div className="col-xs-12">
-									<h2>Timeline</h2>
-									<DevicesTimeline appId={@props.appId}/>
-								</div>
-								<div className="col-xs-12">
-									<h2>Devices</h2>
-									{
-										if @data.devices?.length
-											<div>
-												<DevicesGraph appId={@props.appId}/>
-												<div className="table-responsive">
-													<table className="table table-striped table-bordered table-hover">
-														<thead>
-															<th>Id</th>
-															<th>Browser</th>
-															<th>Size</th>
-															<th>Roles</th>
-															<th>Connected devices</th>
-															<th>Last updated</th>
-														</thead>
-														<tbody>
-															{
-																for device, i in @data.devices
-																	<tr key={i}>
-																		<td>{device.id}</td>
-																		<td>{device.browser} {device.browserVersion}</td>
-																		<td>
-																			{
-																				if device.width? or device.height?
-																					<span>{device.width}x{device.height}</span>
-																			}
-																			{
-																				if device.minWidth != device.maxWidth or device.minHeight != device.maxHeight
-																					<span>&nbsp;({device.minWidth}-{device.maxWidth}x{device.minHeight}-{device.maxHeight})</span>
-																			}
-																		</td>
-																		<td>
-																			{
-																				if device.roles?.length
-																					<ul>
-																						{
-																							for role, i in device.roles
-																								<li key={i}>{role}</li>
-																						}
-																					</ul>
-																			}
-																		</td>
-																		<td>
-																			{
-																				if device.connectedDevices?.length
-																					<ul>
-																						{
-																							for connectedDevice, i in device.connectedDevices
-																								<li key={i}>{connectedDevice}</li>
-																						}
-																					</ul>
-																			}
-																		</td>
-																		<td>
-																			{moment(device.lastUpdatedAt).format('YYYY-MM-DD HH:mm:ss')}
-																		</td>
-																	</tr>
-															}
-														</tbody>
-													</table>
-												</div>
-											</div>
-										else
-											<p>No devices were detected for this app yet.</p>
-									}
-								</div>
-								<div className="col-xs-12">
-									<h2>Logs</h2>
-									{
-										if @data.logs?.length
-											<Table headers={["Logged at", "Device ID", "User ID", "Type", "Comment"]}>
-												{
-													for log, i in @data.logs
-														<tr key={i}>
-															<td>{moment(log.loggedAt).format('YYYY-MM-DD HH:mm:ss:SSS')}</td>
-															<td>{log.device.id}</td>
-															<td>{log.userIdentifier}</td>
-															<td>{log.type}</td>
-															<td>{log.comment}</td>
-														</tr>
-												}
-											</Table>
-										else
-											<p>There are no logs for this app yet.</p>
-									}
-								</div>
-							</div>
+							switch @view()
+								when "overview"
+									<Views.Overview app={@data.app} devices={@data.devices} logs={@data.logs}/>
+								when "timeline"
+									<Views.Timeline appId={@props.appId}/>
+								when "devices"
+									<Views.Devices appId={@props.appId} devices={@data.devices}/>
+								when "logs"
+									<Views.Logs logs={@data.logs}/>
 						else
-							<NotFound />
+							<Templates.NotFound />
 					else
-						<Loading />
+						<Templates.Loading />
 				}
 			</div>
 		</article>
 
-DevicesTimeline = React.createClass
+Views = {}
+
+Views.Overview = React.createClass
+	mixins: [ReactUtils]
+	render: ->
+		<div>
+			<div className="col-xs-12 col-sm-6">
+				<h2>App data</h2>
+				<div>
+					<label>App ID:&nbsp;</label>
+					{@props.app._id}
+				</div>
+				<div>
+					<label>API Key:&nbsp;</label>
+					{@props.app.apiKey}
+				</div>
+			</div>
+			<div className="col-xs-12 col-sm-6">
+				<h2>Statistics</h2>
+				<div>
+					<label>Number of devices:&nbsp;</label>
+					{@props.devices.length}
+				</div>
+				<div>
+					<label>Number of log entries:&nbsp;</label>
+					{@props.logs.length}
+				</div>
+			</div>
+		</div>
+
+
+Views.Timeline = React.createClass
 	mixins: [ReactMeteorData, ReactUtils]
 	getInitialState: ->
 		from: null
@@ -193,6 +151,7 @@ DevicesTimeline = React.createClass
 				date: l.loggedAt
 				value: l.connectedDevices.length
 
+
 		if data.length
 			MG.data_graphic
 				width: @wrapper.width()
@@ -211,7 +170,7 @@ DevicesTimeline = React.createClass
 				#missing_is_hidden: true
 				target: "#timeline"
 				xax_start_at_min: true
-				chart_type: "line"
+				chart_type: "missing-data"
 				transition_on_update: true
 
 
@@ -240,7 +199,8 @@ DevicesTimeline = React.createClass
 		###
 		@start()
 	render: ->
-		<div>
+		<div className="col-xs-12">
+			<h2>Timeline</h2>
 			<p>
 				Time range: {@state.from}-{@state.to}
 			</p>
@@ -255,6 +215,86 @@ DevicesTimeline = React.createClass
 			</div>
 		</div>
 
+Views.Devices = React.createClass
+	render: ->
+		<div className="col-xs-12">
+			<h2>Devices</h2>
+			{
+				if @props.devices?.length
+					<div>
+						<DevicesGraph appId={@props.appId}/>
+						<Templates.Table headers={["Id", "Browser", "Size", "Roles", "Connected devices", "Last updated"]}>
+							{
+								for device, i in @props.devices
+									<tr key={i}>
+										<td>{device.id}</td>
+										<td>{device.browser} {device.browserVersion}</td>
+										<td>
+											{
+												if device.width? or device.height?
+													<span>{device.width}x{device.height}</span>
+											}
+											{
+												if device.minWidth != device.maxWidth or device.minHeight != device.maxHeight
+													<span>&nbsp;({device.minWidth}-{device.maxWidth}x{device.minHeight}-{device.maxHeight})</span>
+											}
+										</td>
+										<td>
+											{
+												if device.roles?.length
+													<ul>
+														{
+															for role, i in device.roles
+																<li key={i}>{role}</li>
+														}
+													</ul>
+											}
+										</td>
+										<td>
+											{
+												if device.connectedDevices?.length
+													<ul>
+														{
+															for connectedDevice, i in device.connectedDevices
+																<li key={i}>{connectedDevice}</li>
+														}
+													</ul>
+											}
+										</td>
+										<td>
+											{moment(device.lastUpdatedAt).format('YYYY-MM-DD HH:mm:ss')}
+										</td>
+									</tr>
+							}
+						</Templates.Table>
+					</div>
+				else
+					<p>No devices were detected for this app yet.</p>
+			}
+		</div>
+
+Views.Logs = React.createClass
+	render: ->
+		<div className="col-xs-12">
+			<h2>Logs</h2>
+			{
+				if @props.logs?.length
+					<Templates.Table headers={["Logged at", "Device ID", "User ID", "Type", "Comment"]}>
+						{
+							for l, i in @props.logs
+								<tr key={i}>
+									<td>{moment(l.loggedAt).format('YYYY-MM-DD HH:mm:ss:SSS')}</td>
+									<td>{l.device.id}</td>
+									<td>{l.userIdentifier}</td>
+									<td>{l.type}</td>
+									<td>{l.comment}</td>
+								</tr>
+						}
+					</Templates.Table>
+				else
+					<p>There are no logs for this app yet.</p>
+			}
+		</div>
 
 DevicesGraph = React.createClass
 	mixins: [ReactMeteorData]

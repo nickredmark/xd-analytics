@@ -15,3 +15,10 @@ Routes.Apps.route '/:appId',
 		ReactLayout.render Templates.MainLayout,
 			content: <Templates.App appId={params.appId}/>
 			access: 'member'
+
+Routes.Apps.route '/:appId/:view',
+	name: 'app'
+	action: (params, queryParams)->
+		ReactLayout.render Templates.MainLayout,
+			content: <Templates.App appId={params.appId} view={params.view}/>
+			access: 'member'

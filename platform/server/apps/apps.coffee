@@ -1,5 +1,5 @@
 Meteor.publish "apps", ->
-	if Roles.userIsInRole(@userId, 'admin')
+	if Roles.userHasRole(@userId, 'admin')
 		Apps.find()
 	else
 		Apps.find
@@ -13,7 +13,7 @@ Meteor.publish "apps", ->
 				apiKey: 1
 
 Meteor.publish "app", (appId) ->
-	if Roles.userIsInRole(@userId, 'admin')
+	if Roles.userHasRole(@userId, 'admin')
 		[
 			Apps.find appId
 			Logs.find

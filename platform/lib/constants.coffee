@@ -4,14 +4,14 @@ Meteor.startup ->
 		throw new Error "No settings file set."
 
 	@Constants =
-		name: "Boilerplate"
-		title: "Boilerplate"
-		description: "A meteor boilerplate."
+		name: "XD-Analytics"
+		title: "XD-Analytics"
+		description: "An analytics platform for cross-device applications."
 		email: "info@example.com"
 		author:
-			name: "John Smith"
-			email: "john@example.com"
-			url: "http://www.example.com"
+			name: "Nicola Marcacci Rossi"
+			email: "nicolamr@gmail.com"
+			url: "nmr.io"
 		startYear: 2015
 		redirectAfterLogin: "/"
 		redirectAfterRegister: "/"

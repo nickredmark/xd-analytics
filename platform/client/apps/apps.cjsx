@@ -7,10 +7,11 @@ Templates.Apps = React.createClass
 		ready: handle.ready()
 		apps: Apps.find().fetch()
 	createApp: (e) ->
-		e.stopPropagation()
+		e.preventDefault()
 		Apps.insert
 			name: @state.name
 			description: @state.description
+		, handleResult("App created")
 	updateName: (e) ->
 		@setState
 			name: e.currentTarget.value
@@ -55,7 +56,7 @@ Templates.Apps = React.createClass
 						else if @data.ready
 							<p>No apps found.</p>
 						else
-							<Loading />
+							<Templates.Loading />
 					}
 				</div>
 			</div>
