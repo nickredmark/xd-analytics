@@ -126,12 +126,8 @@ Views.Overview = React.createClass
 Views.Timeline = React.createClass
 	mixins: [ReactMeteorData, ReactUtils]
 	getInitialState: ->
-		from: null
-		to: null
-	from: ->
-		new Date(@state.from)
-	to: ->
-		new Date(@state.to)
+		from: moment().subtract(30, 'days').toDate()
+		to: new Date()
 	getMeteorData: ->
 		find =
 			appId: @props.appId
@@ -139,24 +135,29 @@ Views.Timeline = React.createClass
 		if @state.from or @state.to
 			find.loggedAt = {}
 		if @state.from
-			find.loggedAt.$gte = @from()
+			find.loggedAt.$gte = @state.from
 		if @state.to
-			find.loggedAt.$lte = @to()
+			find.loggedAt.$lte = @state.to
 
 		logs = Logs.find find,
 				sort:
 					loggedAt: -1
 			.fetch()
 
-		@start()
+		log logs
+
+		@start logs
 
 		logs: logs
-	start: ->
+	start: (logs) ->
 		if not @chart
 			return
 
+		if not logs
+			logs = @data.logs
+
 		data =
-			for l in @data.logs
+			for l in logs
 				date: l.loggedAt
 				value: l.connectedDevices.length
 
@@ -210,15 +211,7 @@ Views.Timeline = React.createClass
 	render: ->
 		<div className="col-xs-12">
 			<h2>Timeline</h2>
-			<p>
-				Time range: {@state.from}-{@state.to}
-			</p>
-			<label>From
-				<Datepicker id="from" value={@state.from} onChange={@updateValue('from', @start)}/>
-			</label>
-			<label>To
-				<Datepicker id="to" value={@state.to} onChange={@updateValue('to', @start)}/>
-			</label>
+			<Templates.DateRangeInput id="range" label="Range" from={@state.from} to={@state.to} onChange={@updateRange('from', 'to')}/>
 			<div id="timeline-wrapper">
 				<div id="timeline"></div>
 			</div>
