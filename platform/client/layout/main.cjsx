@@ -62,6 +62,8 @@ Header = React.createClass
 	getMeteorData: ->
 		user: Meteor.user()
 		isAdmin: Meteor.user()?.isAdmin()
+	menu: ->
+		Constants.menu
 	render: ->
 		<header>
 			<nav className="nav navbar navbar-inverse navbar-static-top" role="navigation">
@@ -84,38 +86,44 @@ Header = React.createClass
 						{
 							if @data.user
 								<ul className="nav navbar-nav navbar-right">
-									<li>
-										<a href="/"><T>home</T></a>
-									</li>
+									{
+										for route, i in @menu()
+											<li key={i} className={if FlowRouter.current().route.name is route then "active" else ""}>
+												<a href={FlowRouter.path(route)}><T>{"routes.#{route}"}</T></a>
+											</li>
+									}
 									<li className="dropdown">
 										<a data-toggle="dropdown" role="button" aria-expanded="false" className="dropdown-toggle" href="#"><T username={@data.user.displayName()}>hello_user</T> <i className="fa fa-caret-down"></i>
 										</a>
 										<ul role="menu" className="dropdown-menu">
 											<li>
-												<a href="/account"><T>account</T></a>
+												<a href="/account"><T>routes.account</T></a>
 											</li>
 											{
 												if @data.isAdmin
 													<li>
-														<a href="/admin"><T>admin</T></a>
+														<a href="/admin"><T>routes.admin</T></a>
 													</li>
 											}
 											<li>
-												<a href="/logout"><T>logout</T></a>
+												<a href="/logout"><T>routes.logout</T></a>
 											</li>
 										</ul>
 									</li>
 								</ul>
 							else
 								<ul className="nav navbar-nav navbar-right">
+									{
+										for route, i in @menu()
+											<li key={i} className={if FlowRouter.current().route.name is route then "active" else ""}>
+												<a href={FlowRouter.path(route)}><T>{"routes.#{route}"}</T></a>
+											</li>
+									}
 									<li>
-										<a href="/"><T>home</T></a>
+										<a href="/register"><T>routes.register</T></a>
 									</li>
 									<li>
-										<a href="/register"><T>register</T></a>
-									</li>
-									<li>
-										<a href="/login"><T>login</T></a>
+										<a href="/login"><T>routes.login</T></a>
 									</li>
 								</ul>
 						}

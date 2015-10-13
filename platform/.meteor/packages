@@ -66,6 +66,7 @@ pascoual:pdfjs
 pascoual:bootstrap-contextmenu
 jquery                  # Helpful client-side library
 mizzao:jquery-ui
+s2corp:bootstrap-daterangepicker
 mrt:jquery-mousewheel
 benjaminrh:jquery-cookie
 steeve:jquery-qrcode
@@ -78,7 +79,6 @@ mquandalle:bower
 oembed:jquery-oembed-all
 force-ssl
 nourharidy:ssl
-rajit:bootstrap3-datepicker
 
 # Internationalization
 universe:i18n

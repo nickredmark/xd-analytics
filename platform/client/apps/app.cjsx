@@ -47,7 +47,12 @@ Templates.App = React.createClass
 							</div>
 						</div>
 					else
-						<Templates.NotFound/>
+						<div className="row">
+							<div className="col-xs-12">
+								<h1>Not found</h1>
+								<p>This app doesn't exist. <a href="/apps">Back to your apps</a>.</p>
+							</div>
+						</div>
 				else
 					<div className="row">
 						<div className="col-xs-12">
@@ -55,16 +60,19 @@ Templates.App = React.createClass
 						</div>
 					</div>
 			}
-			<div className="row">
-				<div className="col-xs-12">
-					<ul className="nav nav-tabs">
-						{
-							for view, label of @views
-								<li key={view} role="presentation" className={if view is @view() then "active" else ""}><a href={@viewUrl(view)}>{label}</a></li>
-						}
-					</ul>
-				</div>
-			</div>
+			{
+				if not @data.ready or @data.app
+					<div className="row">
+						<div className="col-xs-12">
+							<ul className="nav nav-tabs">
+								{
+									for view, label of @views
+										<li key={view} role="presentation" className={if view is @view() then "active" else ""}><a href={@viewUrl(view)}>{label}</a></li>
+								}
+							</ul>
+						</div>
+					</div>
+			}
 			<div className="row">
 				{
 					if @data.ready
@@ -78,8 +86,6 @@ Templates.App = React.createClass
 									<Views.Devices appId={@props.appId} devices={@data.devices}/>
 								when "logs"
 									<Views.Logs logs={@data.logs}/>
-						else
-							<Templates.NotFound />
 					else
 						<Templates.Loading />
 				}

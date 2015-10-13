@@ -24,3 +24,8 @@ a, label {
 .row {
 	margin-bottom: 10px;
 }
+
+#sidebar.affix {
+	position: fixed;
+	top: 20px;
+}

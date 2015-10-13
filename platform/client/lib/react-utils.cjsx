@@ -20,6 +20,13 @@
 				else
 					set[name] = true
 			self.setState set
+	updateRange: (fromName, toName) ->
+		self = @
+		(from, to) ->
+			set = {}
+			set[fromName] = from
+			set[toName] = to
+			self.setState set
 	updateValue: (name) ->
 		self = @
 		(e) ->

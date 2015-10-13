@@ -164,7 +164,12 @@
     margin-left: 83.33333%; }
 
   .col-ms-offset-11 {
-    margin-left: 91.66667%; } }
+    margin-left: 91.66667%; }
+
+  .visible-ms {
+    display: block !important;
+  }
+}
 @media (min-width: 480px) and (max-width: 768px) {
   .container {
     max-width: 748px; } }
