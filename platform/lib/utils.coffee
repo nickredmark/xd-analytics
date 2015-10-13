@@ -10,7 +10,7 @@ Array.prototype.remove ?= (args...) ->
   output = output[0] if args.length is 1
   output
 
-# Logging and error handling
+# Logging, debugging and error handling
 
 # Log error to console and alert
 @handleError = (e) ->
@@ -52,3 +52,10 @@ Array.prototype.remove ?= (args...) ->
 # Execute a function and handle errors
 @doTest = (f, args...) ->
 	test(f)(args...)
+
+
+@blockingSleep = (milliseconds) ->
+	start = new Date().getTime()
+	while true
+		if (new Date().getTime() - start) > milliseconds
+			break

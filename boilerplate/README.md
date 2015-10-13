@@ -61,11 +61,9 @@ Start meteor:
 
 ## TODOS
 
-* iron router -> flow router
-* handlebars+viewmodel+blaze+jade -> react
-* less -> sass
+* Breadcrumbs
+* Mark active page in nav
 * SQL
-* internationalization
 
 Author: Nicola Marcacci Rossi
 Site: nmr.io
