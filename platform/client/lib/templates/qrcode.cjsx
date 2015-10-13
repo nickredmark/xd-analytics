@@ -1,4 +1,4 @@
-@QRCode = React.createClass
+Templates.QRCode = React.createClass
 	componentDidMount: ->
 		$("#qrcode-#{@props.id}").qrcode
 			width: 64,

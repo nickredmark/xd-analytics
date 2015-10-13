@@ -1,0 +1,8 @@
+_namespace: routes
+home: Home
+boilerplate-showcase: Showcase
+login: Log in
+logout: Log out
+register: Register
+admin: Admin
+account: Account

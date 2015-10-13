@@ -91,7 +91,6 @@ ordered-dict@1.0.4
 pascoual:bootstrap-contextmenu@1.0.3
 pascoual:pdfjs@1.1.114
 promise@0.5.0
-rajit:bootstrap3-datepicker@1.4.1
 random@1.0.4
 rate-limit@1.0.0
 react@0.1.13
@@ -105,6 +104,7 @@ reactive-var@1.0.6
 reload@1.1.4
 retry@1.0.4
 routepolicy@1.0.6
+s2corp:bootstrap-daterangepicker@2.0.14_1
 service-configuration@1.0.5
 session@1.1.1
 sha@1.0.4
