@@ -47,7 +47,7 @@ Templates.App = React.createClass
 							</div>
 						</div>
 					else
-						<NotFound/>
+						<Templates.NotFound/>
 				else
 					<div className="row">
 						<div className="col-xs-12">
@@ -55,7 +55,6 @@ Templates.App = React.createClass
 						</div>
 					</div>
 			}
-
 			<div className="row">
 				<div className="col-xs-12">
 					<ul className="nav nav-tabs">
