@@ -21,7 +21,7 @@ Templates.Showcase = React.createClass
 					<p>Selected date: <Templates.Date date={@state.date}/></p>
 
 					<h3 id="range">Range</h3>
-					<Templates.DateRangeInput id="range" label="Range" placeholder={"Full range"} from={@state.rangeFrom} to={@state.rangeTo} onChange={@updateRange('rangeFrom', 'rangeTo')} singleDateInput={true}/>
+					<Templates.DateRangeInput id="range" label="Range" placeholder={"Full range"} from={@state.rangeFrom} to={@state.rangeTo} onChange={@updateRange('rangeFrom', 'rangeTo')}/>
 					<p>Selected range: <Templates.Date date={@state.rangeFrom}/> – <Templates.Date date={@state.rangeTo}/></p>
 
 					<h3 id="time-range">Time range</h3>
