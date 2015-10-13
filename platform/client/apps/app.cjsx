@@ -38,18 +38,20 @@ Templates.App = React.createClass
 	render: ->
 		<article className="container">
 			{
-				if @data.ready and @data.app
-					<div className="row">
-						<div className="col-xs-12">
-							<h1>{@data.app.name}</h1>
-							<p>{@data.app.description}</p>
+				if @data.ready
+					if @data.app
+						<div className="row">
+							<div className="col-xs-12">
+								<h1>{@data.app.name}</h1>
+								<p>{@data.app.description}</p>
+							</div>
 						</div>
-					</div>
+					else
+						<NotFound/>
 				else
 					<div className="row">
 						<div className="col-xs-12">
-							<h1>App view</h1>
-							<Templates.Loading />
+							<h1>Loading App<Templates.Ellipsis/></h1>
 						</div>
 					</div>
 			}
@@ -63,6 +65,8 @@ Templates.App = React.createClass
 						}
 					</ul>
 				</div>
+			</div>
+			<div className="row">
 				{
 					if @data.ready
 						if @data.app
