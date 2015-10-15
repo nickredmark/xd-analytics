@@ -11,6 +11,9 @@
 		},
 		"i18n": {
 			"locale": "en"
+		},
+		"disqus": {
+			"shortname": "XXX"
 		}
 	},
 	"private": {
