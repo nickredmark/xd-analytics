@@ -10,10 +10,10 @@ if Meteor.isServer and not Meteor.settings.private
 		name: "Nicola Marcacci Rossi"
 		email: "nicolamr@gmail.com"
 		url: "nmr.io"
+	footerMotto: "Proudly developed with meteor."
 	startYear: 2015
 	redirectAfterLogin: "/"
 	redirectAfterRegister: "/"
-	boilerplateRoutes: true
 	dateFormat: "YYYY-MM-DD"
 	dateTimeFormat: "YYYY-MM-DD HH:mm"
 	menu: [

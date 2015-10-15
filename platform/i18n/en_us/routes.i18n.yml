@@ -7,3 +7,6 @@ register: Register
 admin: Admin
 account: Account
 apps: Apps
+about: About
+blog: Blog
+todo: To do

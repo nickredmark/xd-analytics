@@ -143,7 +143,7 @@ Footer = React.createClass
 		<footer id="footer" className="footer">
 			<div className="container">
 				<p className="text-center text-muted">
-					© {@years()} - <a href={Constants.author.url}>{Constants.author.name}</a>
+					© {@years()} - <a href={Constants.author.url}>{Constants.author.name}</a><br/> {Constants.footerMotto}
 				</p>
 			</div>
 		</footer>

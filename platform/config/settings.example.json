@@ -8,6 +8,12 @@
 		},
 		"google": {
 			"enabled": false
+		},
+		"i18n": {
+			"locale": "en"
+		},
+		"disqus": {
+			"shortname": "XXX"
 		}
 	},
 	"private": {

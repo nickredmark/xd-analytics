@@ -40,6 +40,11 @@ kadira:react-layout
 reload
 ejson
 meteorhacks:fast-render
+chuangbo:marked
+simple:highlight.js
+
+# SEO
+ongoworks:spiderable
 
 # Accounts
 accounts-password
