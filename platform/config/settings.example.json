@@ -8,6 +8,9 @@
 		},
 		"google": {
 			"enabled": false
+		},
+		"i18n": {
+			"locale": "en"
 		}
 	},
 	"private": {

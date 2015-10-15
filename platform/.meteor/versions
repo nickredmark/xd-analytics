@@ -88,6 +88,7 @@ oauth2@1.1.5
 observe-sequence@1.0.7
 oembed:jquery-oembed-all@1.1.0
 ongoworks:security@1.3.0
+ongoworks:spiderable@1.0.7
 ordered-dict@1.0.4
 pascoual:bootstrap-contextmenu@1.0.3
 pascoual:pdfjs@1.1.114

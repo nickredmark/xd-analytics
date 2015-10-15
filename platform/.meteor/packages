@@ -41,6 +41,9 @@ reload
 ejson
 meteorhacks:fast-render
 
+# SEO
+ongoworks:spiderable
+
 # Accounts
 accounts-password
 accounts-facebook
