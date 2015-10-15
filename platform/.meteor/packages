@@ -69,7 +69,7 @@ pascoual:pdfjs
 pascoual:bootstrap-contextmenu
 jquery                  # Helpful client-side library
 mizzao:jquery-ui
-sc2corp:bootstrap-daterangepicker
+s2corp:bootstrap-daterangepicker
 mrt:jquery-mousewheel
 benjaminrh:jquery-cookie
 steeve:jquery-qrcode
