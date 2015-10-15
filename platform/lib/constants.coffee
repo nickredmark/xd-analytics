@@ -10,13 +10,12 @@ if Meteor.isServer and not Meteor.settings.private
 		name: "John Smith"
 		email: "john@example.com"
 		url: "http://www.example.com"
+	footerMotto: "Proudly developed with meteor."
 	startYear: 2015
 	redirectAfterLogin: "/"
 	redirectAfterRegister: "/"
-	boilerplateRoutes: true
 	dateFormat: "YYYY-MM-DD"
 	dateTimeFormat: "YYYY-MM-DD HH:mm"
 	menu: [
 		'home'
-		'boilerplate-showcase'
 	]
