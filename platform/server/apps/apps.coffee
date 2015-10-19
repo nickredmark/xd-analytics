@@ -21,7 +21,6 @@ Meteor.publish "app", (appId) ->
 			,
 				sort:
 					loggedAt: -1
-				limit: 50
 			Devices.find
 				appId: appId
 			,

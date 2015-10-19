@@ -21,12 +21,16 @@ Templates.DateRangePicker = React.createClass
 					moment().format(@props.format)
 					moment().format(@props.format)
 				]
+				"Last 7 Days": [
+					moment().subtract(7, 'days').format(@props.format)
+					moment().format(@props.format)
+				]
 				"Last 30 Days": [
 					moment().subtract(30, 'days').format(@props.format)
 					moment().format(@props.format)
 				]
 		, (from, to) ->
-			self.props.onChange	from, to
+			self.props.onChange	from.toDate(), to.toDate()
 	defaultValue: ->
 		if @props.singleDatePicker
 			moment(@props.date).format(@props.format)

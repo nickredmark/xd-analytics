@@ -84,6 +84,7 @@ mquandalle:bower
 oembed:jquery-oembed-all
 force-ssl
 nourharidy:ssl
+chart:chart
 
 # Internationalization
 universe:i18n

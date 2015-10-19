@@ -21,9 +21,9 @@ Templates.Slider = React.createClass
 Templates.Select = React.createClass
 	render: ->
 		<Templates.FormGroup id={@props.id} label={@props.label}>
-			<select id={@props.id}>
+			<select id={@props.id} value={@props.value} onChange={@props.onChange} className="form-control">
 				{
-					for option, key in @props.options
+					for key, option of @props.options
 						<option key={key} value={key}>{option}</option>
 				}
 			</select>

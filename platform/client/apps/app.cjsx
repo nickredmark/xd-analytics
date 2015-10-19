@@ -125,6 +125,171 @@ Views.Overview = React.createClass
 
 Views.Timeline = React.createClass
 	mixins: [ReactMeteorData, ReactUtils]
+	displays:
+		logs: "Number of logs"
+		users: "Users"
+		devices: "Devices"
+	getInitialState: ->
+		from: moment().subtract(7, 'days').toDate()
+		to: new Date()
+		display: 'logs'
+	getMeteorData: ->
+		find =
+			appId: @props.appId
+
+		if @state.from or @state.to
+			find.loggedAt = {}
+		if @state.from
+			find.loggedAt.$gte = @state.from
+		if @state.to
+			find.loggedAt.$lte = @state.to
+
+		logs = Logs.find find,
+				sort:
+					loggedAt: 1
+			.fetch()
+
+		@update logs
+
+		logs: logs
+	timeline: null
+	chart: null
+
+	update: (logs) ->
+		if not logs
+			return
+
+		group = false
+		switch @state.display
+			when "logs"
+				data = (date: l.loggedAt for l in logs)
+			when "users"
+				group = true
+				data = []
+				for l in logs
+					if l.userIdentifier
+						data.push
+							date: l.loggedAt
+							id: l.userIdentifier
+			when "devices"
+				group = true
+				data = []
+				for l in logs
+					data.push
+						date: l.loggedAt
+						id: l.device.id
+
+		@updateGraph data, group
+	componentDidMount: ->
+		@timeline = document.getElementById("timeline")
+
+		if @data.logs
+			@updateGraph (l.loggedAt for l in @data.logs)
+	updateGraph: (data, group) ->
+		if not data
+			return
+
+		if not @timeline
+			return
+		buckets = []
+		values = []
+
+		from = moment(@state.from)
+		to = moment(@state.to)
+
+		if to.diff(from, 'weeks') > 40
+			granularity = 'month'
+		else if to.diff(from, 'days') > 40
+			granularity = 'week'
+		else if to.diff(from, 'hours') > 40
+			granularity = 'day'
+		else
+			granularity = 'hour'
+
+		# Create buckets
+
+		current = from.startOf(granularity)
+		to = to.endOf(granularity)
+		while current < to
+			buckets.push moment(current)
+			if group
+				values.push {}
+			else
+				values.push 0
+			current.add(1, granularity)
+
+		formats =
+			month: "MMMM"
+			week: "w"
+			day: "D"
+			hour: "H"
+		labels = (point.format(formats[granularity]) for point in buckets)
+		buckets.push moment(current)
+
+		i = 0
+		# Discard all points earlier than buckets[0]
+		while i < data.length
+			current = moment(data[i].date)
+			if current >= buckets[0]
+				break
+			i++
+
+		j = 1
+		# Add al points to their respective buckets
+		while i < data.length and j < buckets.length
+			current = moment(data[i].date)
+			while current > buckets[j] and j < buckets.length
+				j++
+
+			if j >= buckets.length
+				break
+
+			if group
+				if values[j-1][data[i].id]
+					values[j-1][data[i].id]++
+				else
+					values[j-1][data[i].id] = 1
+			else
+				values[j-1]++
+
+			i++
+
+		if group
+			for value, i in values
+				values[i] = Object.keys(values[i]).length
+
+		if @lineChart
+			@lineChart.destroy()
+
+		ctx = @timeline.getContext("2d")
+		@chart = new Chart(ctx)
+		@lineChart = @chart.Line
+			labels: labels
+			datasets: [
+				label: "Logs"
+				data: values
+			]
+
+	render: ->
+		<div>
+			<div className="col-xs-12">
+				<h2>Timeline</h2>
+			</div>
+			<div className="col-xs-12 col-sm-6">
+				<Templates.DateRangeInput id="range" label="Time range" from={@state.from} to={@state.to} onChange={@updateRange('from', 'to')}/>
+			</div>
+			<div className="col-xs-12 col-sm-6">
+				<Templates.Select id="display" label="Data" options={@displays} value={@state.display} onChange={@updateValue('display')}/>
+			</div>
+			<div className="col-xs-12">
+				<div id="timeline-wrapper">
+					<canvas id="timeline"></canvas>
+				</div>
+			</div>
+		</div>
+
+Views.OldTimeline = React.createClass
+	mixins: [ReactMeteorData, ReactUtils]
 	getInitialState: ->
 		from: moment().subtract(30, 'days').toDate()
 		to: new Date()
