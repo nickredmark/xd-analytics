@@ -18,8 +18,16 @@ Meteor.publish "app", (appId) ->
 			Apps.find appId
 			Logs.find
 				appId: appId
+			,
+				sort:
+					loggedAt: -1
+				limit: 50
 			Devices.find
 				appId: appId
+			,
+				sort:
+					lastUpdatedAt: -1
+				limit: 50
 		]
 	else
 		app = Apps.find
@@ -37,8 +45,9 @@ Meteor.publish "app", (appId) ->
 			logs = Logs.find
 				appId: appId
 			,
-				orderBy:
+				sort:
 					loggedAt: -1
+				limit: 50
 				fields:
 					appId: 1
 					createdAt: 1
@@ -50,8 +59,9 @@ Meteor.publish "app", (appId) ->
 			devices = Devices.find
 				appId: appId
 			,
-				orderBy:
+				sort:
 					lastUpdatedAt: -1
+				limit: 50
 				fields:
 					id: 1
 					appId: 1

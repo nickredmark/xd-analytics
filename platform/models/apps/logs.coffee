@@ -41,6 +41,9 @@ Schemas.Log = new SimpleSchema
 				$setOnInsert: new Date
 			else
 				@unset()
+	location:
+		type: String
+		optional: true
 	loggedAt:
 		type: Date
 		denyUpdate: true

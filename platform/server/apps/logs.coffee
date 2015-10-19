@@ -11,6 +11,7 @@ Meteor.methods
 			l.appId = appId
 			Logs.insert l
 
+###
 Logs.after.insert (userId, log) ->
 	updateDevice = (device, connectedDevices) ->
 		if not device.id
@@ -95,3 +96,4 @@ Logs.after.insert (userId, log) ->
 	updateDevice(log.device, log.connectedDevices)
 	for device in log.connectedDevices
 		updateDevice(device)
+###

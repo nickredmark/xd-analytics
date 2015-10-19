@@ -144,8 +144,6 @@ Views.Timeline = React.createClass
 					loggedAt: -1
 			.fetch()
 
-		log logs
-
 		@start logs
 
 		logs: logs
@@ -281,13 +279,14 @@ Views.Logs = React.createClass
 			<h2>Logs</h2>
 			{
 				if @props.logs?.length
-					<Templates.Table headers={["Logged at", "Device ID", "User ID", "Type", "Comment"]}>
+					<Templates.Table headers={["Logged at", "Device ID", "User ID", "Location", "Type", "Comment"]}>
 						{
 							for l, i in @props.logs
 								<tr key={i}>
 									<td>{moment(l.loggedAt).format('YYYY-MM-DD HH:mm:ss:SSS')}</td>
 									<td>{l.device.id}</td>
 									<td>{l.userIdentifier}</td>
+									<td>{l.location}</td>
 									<td>{l.type}</td>
 									<td>{l.comment}</td>
 								</tr>
