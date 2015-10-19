@@ -54,11 +54,11 @@ Templates.Register = React.createClass
 					</div>
 					<div className="form-group">
 						<label htmlFor="password"><T>password</T></label>
-						<input id="password" value={@state.password} onChange={@updateValue('password')} className="form-control" placeholder={__("password_placeholder")}/>
+						<input id="password" type="password" value={@state.password} onChange={@updateValue('password')} className="form-control" placeholder={__("password_placeholder")}/>
 					</div>
 					<div className="form-group">
 						<label htmlFor="username"><T>password_again</T></label>
-						<input id="username" value={@state.password2} onChange={@updateValue('password2')} className="form-control" placeholder={__("password_placeholder")}/>
+						<input id="username" type="password" value={@state.password2} onChange={@updateValue('password2')} className="form-control" placeholder={__("password_placeholder")}/>
 					</div>
 					<div className="form-group">
 						<button type="submit" className="btn btn-primary btn-md btn-block"><T>Register</T></button>
