@@ -130,6 +130,8 @@ Views.Timeline = React.createClass
 		users: "Users"
 		devices: "Devices"
 		views: "Page views"
+		logins: "Logins"
+		logouts: "Logouts"
 		uniquePages: "Unique page views"
 		maxDevices: "Max devices per user"
 		browsers: "Browsers"
@@ -210,6 +212,22 @@ Views.Timeline = React.createClass
 				reduce = ->
 				@lineChart logs, date, start, combine, reduce
 
+			when "logins"
+				start = -> 0
+				combine = (values, index, element) ->
+					if element.type in ["login"]
+						values[index]++
+				reduce = ->
+				@lineChart logs, date, start, combine, reduce
+
+			when "logouts"
+				start = -> 0
+				combine = (values, index, element) ->
+					if element.type in ["logout"]
+						values[index]++
+				reduce = ->
+				@lineChart logs, date, start, combine, reduce
+
 			when "uniquePages"
 				start = -> {}
 				combine = (values, index, element) ->
@@ -236,32 +254,41 @@ Views.Timeline = React.createClass
 			when "browsers"
 				key = (element) ->
 					element.device.browser
-				@pieChart logs, key
+				filter = (element) ->
+					element.type in ["connected", "location"]
+				@pieChart logs, key, filter
 
 			when "browserVersions"
 				key = (element) ->
 					"#{element.device.browser} #{element.device.browserVersion}"
-				@pieChart logs, key
+				filter = (element) ->
+					element.type in ["connected", "location"]
+				@pieChart logs, key, filter
 
 			when "oses"
 				key = (element) ->
 					element.device.os
-				@pieChart logs, key
+				filter = (element) ->
+					element.type in ["connected", "location"]
+				@pieChart logs, key, filter
 
 			when "pages"
 				key = (element) ->
 					element.location
-				@pieChart logs, key
+				filter = (element) ->
+					element.type in ["connected", "location"]
+				@pieChart logs, key, filter
 
-	pieChart: (data, key) ->
+	pieChart: (data, key, filter) ->
 		i = 0
 		buckets = {}
 		while i < data.length
 			k = key(data[i])
-			if not buckets[k]
-				buckets[k] = 1
-			else
-				buckets[k]++
+			if filter(data[i])
+				if not buckets[k]
+					buckets[k] = 1
+				else
+					buckets[k]++
 			i++
 
 		values = []
