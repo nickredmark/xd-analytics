@@ -129,6 +129,9 @@ Views.Timeline = React.createClass
 		logs: "Number of logs"
 		users: "Users"
 		devices: "Devices"
+		pages: "Page views"
+		uniquePages: "Unique page views"
+		maxDevices: "Max devices per user"
 	getInitialState: ->
 		from: moment().subtract(7, 'days').toDate()
 		to: new Date()
@@ -159,38 +162,69 @@ Views.Timeline = React.createClass
 		if not logs
 			return
 
-		group = false
+		date = (point) ->
+			point.loggedAt
+
 		switch @state.display
 			when "logs"
-				data = (date: l.loggedAt for l in logs)
-			when "users"
-				group = true
-				data = []
-				for l in logs
-					if l.userIdentifier
-						data.push
-							date: l.loggedAt
-							id: l.userIdentifier
-			when "devices"
-				group = true
-				data = []
-				for l in logs
-					data.push
-						date: l.loggedAt
-						id: l.device.id
+				start = -> 0
+				combine = (values, index, element) ->
+					values[index]++
+				reduce = (values, index) ->
+					values[index] = values[index]
 
-		@updateGraph data, group
+			when "users"
+				start = -> {}
+				combine = (values, index, element) ->
+					if element.userIdentifier
+						values[index][element.userIdentifier] = 1
+				reduce = (values, index) ->
+					values[index] = Object.keys(values[index]).length
+
+			when "devices"
+				start = -> {}
+				combine = (values, index, element) ->
+					if element.device.id
+						values[index][element.device.id] = 1
+				reduce = (values, index) ->
+					values[index] = Object.keys(values[index]).length
+
+			when "pages"
+				start = -> 0
+				combine = (values, index, element) ->
+					if element.type in ["connected", "location"]
+						values[index]++
+				reduce = ->
+
+			when "uniquePages"
+				start = -> {}
+				combine = (values, index, element) ->
+					if element.type in ["connected", "location"]
+						values[index][element.location] = 1
+				reduce = (values, index) ->
+					values[index] = Object.keys(values[index]).length
+
+			when "maxDevices"
+				start = -> {}
+				combine = (values, index, element) ->
+					if element.userIdentifier
+						if not values[index][element.userIdentifier]
+							values[index][element.userIdentifier] = {}
+						values[index][element.userIdentifier][element.device.id] = 1
+				reduce = (values, index) ->
+					max = 0
+					for key, value of values[index]
+						max = Math.max(max, Object.keys(value).length)
+					values[index] = max
+
+		@updateGraph logs, date, start, combine, reduce
 	componentDidMount: ->
 		@timeline = document.getElementById("timeline")
 
 		if @data.logs
-			@updateGraph (l.loggedAt for l in @data.logs)
-	updateGraph: (data, group) ->
-		if not data
-			return
+			@update @data.logs
+	getBuckets: (start) ->
 
-		if not @timeline
-			return
 		buckets = []
 		values = []
 
@@ -212,10 +246,7 @@ Views.Timeline = React.createClass
 		to = to.endOf(granularity)
 		while current < to
 			buckets.push moment(current)
-			if group
-				values.push {}
-			else
-				values.push 0
+			values.push start()
 			current.add(1, granularity)
 
 		formats =
@@ -226,10 +257,20 @@ Views.Timeline = React.createClass
 		labels = (point.format(formats[granularity]) for point in buckets)
 		buckets.push moment(current)
 
+		[labels, buckets, values]
+	updateGraph: (data, date, start, combine, reduce) ->
+		if not data
+			return
+
+		if not @timeline
+			return
+
+		[labels, buckets, values] = @getBuckets start
+
 		i = 0
 		# Discard all points earlier than buckets[0]
 		while i < data.length
-			current = moment(data[i].date)
+			current = moment(date(data[i]))
 			if current >= buckets[0]
 				break
 			i++
@@ -237,26 +278,20 @@ Views.Timeline = React.createClass
 		j = 1
 		# Add al points to their respective buckets
 		while i < data.length and j < buckets.length
-			current = moment(data[i].date)
+			current = moment(date(data[i]))
 			while current > buckets[j] and j < buckets.length
 				j++
 
 			if j >= buckets.length
 				break
 
-			if group
-				if values[j-1][data[i].id]
-					values[j-1][data[i].id]++
-				else
-					values[j-1][data[i].id] = 1
-			else
-				values[j-1]++
+			combine(values, j-1, data[i])
 
 			i++
 
-		if group
-			for value, i in values
-				values[i] = Object.keys(values[i]).length
+		# Reduce the bucket values
+		for value, i in values
+			reduce(values, i)
 
 		if @lineChart
 			@lineChart.destroy()
@@ -444,12 +479,13 @@ Views.Logs = React.createClass
 			<h2>Logs</h2>
 			{
 				if @props.logs?.length
-					<Templates.Table headers={["Logged at", "Device ID", "User ID", "Location", "Type", "Comment"]}>
+					<Templates.Table headers={["Logged at", "Device ID", "Device", "User ID", "Location", "Type", "Comment"]}>
 						{
 							for l, i in @props.logs
 								<tr key={i}>
 									<td>{moment(l.loggedAt).format('YYYY-MM-DD HH:mm:ss:SSS')}</td>
 									<td>{l.device.id}</td>
+									<td>{l.device.os}, {l.device.browser} {l.device.browserVersion} ({l.device.width}x{l.device.height})</td>
 									<td>{l.userIdentifier}</td>
 									<td>{l.location}</td>
 									<td>{l.type}</td>

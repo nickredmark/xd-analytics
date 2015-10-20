@@ -22,6 +22,9 @@ Schemas.DeviceState = new SimpleSchema
 	browserVersion:
 		type: String
 		optional: true
+	os:
+		type: String
+		optional: true
 
 Schemas.Log = new SimpleSchema
 	userIdentifier:
@@ -56,7 +59,7 @@ Schemas.Log = new SimpleSchema
 	device:
 		type: Schemas.DeviceState
 	connectedDevices:
-		type: [Schemas.DeviceState]
+		type: [String]
 
 Logs.attachSchema Schemas.Log
 
