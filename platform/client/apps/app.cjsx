@@ -129,13 +129,22 @@ Views.Timeline = React.createClass
 		logs: "Number of logs"
 		users: "Users"
 		devices: "Devices"
-		pages: "Page views"
+		views: "Page views"
 		uniquePages: "Unique page views"
 		maxDevices: "Max devices per user"
+		browsers: "Browsers"
+		browserVersions: "Browser versions"
+		oses: "Operating systems"
+		pages: "Pages"
 	getInitialState: ->
 		from: moment().subtract(7, 'days').toDate()
 		to: new Date()
 		display: 'logs'
+	componentDidMount: ->
+		@timeline = document.getElementById("timeline")
+
+		if @data.logs
+			@update @data.logs
 	getMeteorData: ->
 		find =
 			appId: @props.appId
@@ -157,6 +166,7 @@ Views.Timeline = React.createClass
 		logs: logs
 	timeline: null
 	chart: null
+	currentChart: null
 
 	update: (logs) ->
 		if not logs
@@ -172,6 +182,7 @@ Views.Timeline = React.createClass
 					values[index]++
 				reduce = (values, index) ->
 					values[index] = values[index]
+				@lineChart logs, date, start, combine, reduce
 
 			when "users"
 				start = -> {}
@@ -180,6 +191,7 @@ Views.Timeline = React.createClass
 						values[index][element.userIdentifier] = 1
 				reduce = (values, index) ->
 					values[index] = Object.keys(values[index]).length
+				@lineChart logs, date, start, combine, reduce
 
 			when "devices"
 				start = -> {}
@@ -188,13 +200,15 @@ Views.Timeline = React.createClass
 						values[index][element.device.id] = 1
 				reduce = (values, index) ->
 					values[index] = Object.keys(values[index]).length
+				@lineChart logs, date, start, combine, reduce
 
-			when "pages"
+			when "views"
 				start = -> 0
 				combine = (values, index, element) ->
 					if element.type in ["connected", "location"]
 						values[index]++
 				reduce = ->
+				@lineChart logs, date, start, combine, reduce
 
 			when "uniquePages"
 				start = -> {}
@@ -203,6 +217,7 @@ Views.Timeline = React.createClass
 						values[index][element.location] = 1
 				reduce = (values, index) ->
 					values[index] = Object.keys(values[index]).length
+				@lineChart logs, date, start, combine, reduce
 
 			when "maxDevices"
 				start = -> {}
@@ -216,13 +231,64 @@ Views.Timeline = React.createClass
 					for key, value of values[index]
 						max = Math.max(max, Object.keys(value).length)
 					values[index] = max
+				@lineChart logs, date, start, combine, reduce
 
-		@updateGraph logs, date, start, combine, reduce
-	componentDidMount: ->
-		@timeline = document.getElementById("timeline")
+			when "browsers"
+				key = (element) ->
+					element.device.browser
+				@pieChart logs, key
 
-		if @data.logs
-			@update @data.logs
+			when "browserVersions"
+				key = (element) ->
+					"#{element.device.browser} #{element.device.browserVersion}"
+				@pieChart logs, key
+
+			when "oses"
+				key = (element) ->
+					element.device.os
+				@pieChart logs, key
+
+			when "pages"
+				key = (element) ->
+					element.location
+				@pieChart logs, key
+
+	pieChart: (data, key) ->
+		i = 0
+		buckets = {}
+		while i < data.length
+			k = key(data[i])
+			if not buckets[k]
+				buckets[k] = 1
+			else
+				buckets[k]++
+			i++
+
+		values = []
+		for label, count of buckets
+
+			color = [Math.floor(Math.random()*256), Math.floor(Math.random()*256), Math.floor(Math.random()*256)]
+
+			lighten = 20
+
+			highlight = [Math.min(color[0] + lighten, 255), Math.min(color[1] + lighten, 255), Math.min(color[2] + lighten, 255)]
+
+			values.push
+				value: count
+				label: label
+				color: "rgb(#{color[0]},#{color[1]},#{color[2]})"
+				highlight: "rgb(#{highlight[0]},#{highlight[1]},#{highlight[2]})"
+
+		values.sort (a, b) ->
+			a.value <= b.value
+
+		if @currentChart
+			@currentChart.destroy()
+
+		ctx = @timeline.getContext("2d")
+		@chart = new Chart(ctx)
+		@currentChart = @chart.Pie values
+
 	getBuckets: (start) ->
 
 		buckets = []
@@ -258,7 +324,7 @@ Views.Timeline = React.createClass
 		buckets.push moment(current)
 
 		[labels, buckets, values]
-	updateGraph: (data, date, start, combine, reduce) ->
+	lineChart: (data, date, start, combine, reduce) ->
 		if not data
 			return
 
@@ -293,12 +359,12 @@ Views.Timeline = React.createClass
 		for value, i in values
 			reduce(values, i)
 
-		if @lineChart
-			@lineChart.destroy()
+		if @currentChart
+			@currentChart.destroy()
 
 		ctx = @timeline.getContext("2d")
 		@chart = new Chart(ctx)
-		@lineChart = @chart.Line
+		@currentChart = @chart.Line
 			labels: labels
 			datasets: [
 				label: "Logs"
