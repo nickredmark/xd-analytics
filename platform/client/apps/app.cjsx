@@ -131,13 +131,13 @@ Views.Timeline = React.createClass
 		devices: "Devices"
 		views: "Page views"
 		logins: "Logins"
-		logouts: "Logouts"
 		uniquePages: "Unique page views"
 		maxDevices: "Max devices per user"
 		browsers: "Browsers"
 		browserVersions: "Browser versions"
 		oses: "Operating systems"
 		pages: "Pages"
+		deviceTypes: "Device types"
 	getInitialState: ->
 		from: moment().subtract(7, 'days').toDate()
 		to: new Date()
@@ -177,99 +177,99 @@ Views.Timeline = React.createClass
 		date = (point) ->
 			point.loggedAt
 
+		reduce = (value) ->
+			if value?
+				value
+			else
+				0
+
 		switch @state.display
 			when "logs"
-				start = -> 0
-				combine = (values, index, element) ->
-					values[index]++
-				reduce = (values, index) ->
-					values[index] = values[index]
-				@lineChart logs, date, start, combine, reduce
+				assign = (map, element) ->
+					if not map["Logs"]
+						map["Logs"] = 1
+					else
+						map["Logs"]++
+				@lineChart logs, date, assign, reduce
 
 			when "users"
-				start = -> {}
-				combine = (values, index, element) ->
-					if element.userIdentifier
-						values[index][element.userIdentifier] = 1
-				reduce = (values, index) ->
-					values[index] = Object.keys(values[index]).length
-				@lineChart logs, date, start, combine, reduce
+				assign = (map, element) ->
+					if not map.Users
+						map["Users"] = {}
+					map["Users"][element.userIdentifier] = 1
+				reduce = (value) ->
+					Object.keys(value).length
+				@lineChart logs, date, assign, reduce
 
 			when "devices"
-				start = -> {}
-				combine = (values, index, element) ->
-					if element.device.id
-						values[index][element.device.id] = 1
-				reduce = (values, index) ->
-					values[index] = Object.keys(values[index]).length
-				@lineChart logs, date, start, combine, reduce
+				assign = (map, element) ->
+					if not map.Devices
+						map["Devices"] = {}
+					map["Devices"][element.device.id] = 1
+				reduce = (value) ->
+					Object.keys(value).length
+				@lineChart logs, date, assign, reduce
 
 			when "views"
-				start = -> 0
-				combine = (values, index, element) ->
-					if element.type in ["connected", "location"]
-						values[index]++
-				reduce = ->
-				@lineChart logs, date, start, combine, reduce
-
-			when "logins"
-				start = -> 0
-				combine = (values, index, element) ->
-					if element.type in ["login"]
-						values[index]++
-				reduce = ->
-				@lineChart logs, date, start, combine, reduce
-
-			when "logouts"
-				start = -> 0
-				combine = (values, index, element) ->
-					if element.type in ["logout"]
-						values[index]++
-				reduce = ->
-				@lineChart logs, date, start, combine, reduce
+				assign = (map, element) ->
+					if not map["Views"]
+						map["Views"] = 1
+					else
+						map["Views"]++
+				@lineChart logs, date, assign, reduce
 
 			when "uniquePages"
-				start = -> {}
-				combine = (values, index, element) ->
+				assign = (map, element) ->
 					if element.type in ["connected", "location"]
-						values[index][element.location] = 1
-				reduce = (values, index) ->
-					values[index] = Object.keys(values[index]).length
-				@lineChart logs, date, start, combine, reduce
+						if not map["Pages"]
+							map["Pages"] = {}
+						map["Pages"][element.location] = 1
+				reduce = (value) ->
+					Object.keys(value).length
+				@lineChart logs, date, assign, reduce
 
-			when "maxDevices"
-				start = -> {}
-				combine = (values, index, element) ->
+			when "logins"
+				assign = (map, element) ->
+					if element.type in ["login"]
+						if not map["Logins"]
+							map["Logins"] = 0
+						map["Logins"]++
+					else if element.type in ["logout"]
+						if not map["Logouts"]
+							map["Logouts"] = 0
+						map["Logouts"]++
+				@lineChart logs, date, assign, reduce
+
+			when "devicesPerUser"
+				assign = (map, element) ->
 					if element.userIdentifier
-						if not values[index][element.userIdentifier]
-							values[index][element.userIdentifier] = {}
-						values[index][element.userIdentifier][element.device.id] = 1
-				reduce = (values, index) ->
-					max = 0
-					for key, value of values[index]
-						max = Math.max(max, Object.keys(value).length)
-					values[index] = max
-				@lineChart logs, date, start, combine, reduce
+						if not map[element.userIdentifier]
+							map[element.userIdentifier] = {}
+						map[element.userIdentifier][element.device.id] = 1
+				# TODO transform
+				reduce = (value) ->
+						Object.keys(value).length
+				@lineChart logs, date, combine, reduce
 
 			when "browsers"
 				key = (element) ->
 					element.device.browser
 				filter = (element) ->
-					element.type in ["connected", "location"]
+					element.type in ["connected"]
 				@pieChart logs, key, filter
 
 			when "browserVersions"
 				key = (element) ->
 					"#{element.device.browser} #{element.device.browserVersion}"
 				filter = (element) ->
-					element.type in ["connected", "location"]
+					element.type in ["connected"]
 				@pieChart logs, key, filter
 
 			when "oses"
 				key = (element) ->
 					element.device.os
 				filter = (element) ->
-					element.type in ["connected", "location"]
+					element.type in ["connected"]
 				@pieChart logs, key, filter
 
 			when "pages"
@@ -277,6 +277,13 @@ Views.Timeline = React.createClass
 					element.location
 				filter = (element) ->
 					element.type in ["connected", "location"]
+				@pieChart logs, key, filter
+
+			when "deviceTypes"
+				key = (element) ->
+					element.deviceType()
+				filter = (element) ->
+					element.type in ["connected"]
 				@pieChart logs, key, filter
 
 	pieChart: (data, key, filter) ->
@@ -294,17 +301,12 @@ Views.Timeline = React.createClass
 		values = []
 		for label, count of buckets
 
-			color = [Math.floor(Math.random()*256), Math.floor(Math.random()*256), Math.floor(Math.random()*256)]
-
-			lighten = 20
-
-			highlight = [Math.min(color[0] + lighten, 255), Math.min(color[1] + lighten, 255), Math.min(color[2] + lighten, 255)]
-
+			[color, highlight] = @colorPair 1
 			values.push
 				value: count
 				label: label
-				color: "rgb(#{color[0]},#{color[1]},#{color[2]})"
-				highlight: "rgb(#{highlight[0]},#{highlight[1]},#{highlight[2]})"
+				color: color
+				highlight: highlight
 
 		values.sort (a, b) ->
 			a.value <= b.value
@@ -316,10 +318,19 @@ Views.Timeline = React.createClass
 		@chart = new Chart(ctx)
 		@currentChart = @chart.Pie values
 
-	getBuckets: (start) ->
+	colorPair: (alpha) ->
+			color = [Math.floor(Math.random()*256), Math.floor(Math.random()*256), Math.floor(Math.random()*256)]
+
+			lighten = 20
+
+			highlight = [Math.min(color[0] + lighten, 255), Math.min(color[1] + lighten, 255), Math.min(color[2] + lighten, 255)]
+
+			["rgba(#{color[0]},#{color[1]},#{color[2]},1)", "rgba(#{highlight[0]},#{highlight[1]},#{highlight[2]},#{alpha})"]
+
+
+	getBuckets: ->
 
 		buckets = []
-		values = []
 
 		from = moment(@state.from)
 		to = moment(@state.to)
@@ -339,26 +350,25 @@ Views.Timeline = React.createClass
 		to = to.endOf(granularity)
 		while current < to
 			buckets.push moment(current)
-			values.push start()
 			current.add(1, granularity)
 
 		formats =
 			month: "MMMM"
 			week: "w"
 			day: "D"
-			hour: "H"
+			hour: "H:00"
 		labels = (point.format(formats[granularity]) for point in buckets)
 		buckets.push moment(current)
 
-		[labels, buckets, values]
-	lineChart: (data, date, start, combine, reduce) ->
+		[labels, buckets]
+	lineChart: (data, date, assign, reduce) ->
 		if not data
 			return
 
 		if not @timeline
 			return
 
-		[labels, buckets, values] = @getBuckets start
+		[labels, buckets, values] = @getBuckets()
 
 		i = 0
 		# Discard all points earlier than buckets[0]
@@ -368,6 +378,7 @@ Views.Timeline = React.createClass
 				break
 			i++
 
+		values = []
 		j = 1
 		# Add al points to their respective buckets
 		while i < data.length and j < buckets.length
@@ -378,25 +389,48 @@ Views.Timeline = React.createClass
 			if j >= buckets.length
 				break
 
-			combine(values, j-1, data[i])
+			if not values[j-1]
+				values[j-1] = {}
+			assign(values[j-1], data[i])
 
 			i++
 
-		# Reduce the bucket values
-		for value, i in values
-			reduce(values, i)
+		datasetsMap = {}
+		# Reduce
+		for map, i in values
+			for key, value of map
+				if not datasetsMap[key]
+					datasetsMap[key] = []
+				datasetsMap[key][i] = reduce(value)
+
+		if not Object.keys(datasetsMap).length
+			datasetsMap["No Data"] = {}
+
+		datasets = []
+		for key, data of datasetsMap
+			i = 0
+			while i < labels.length
+				if not data[i]
+					data[i] = 0
+				i++
+			[color, lighter] = @colorPair(0.5)
+			datasets.push
+				label: key
+				data: data
+				fillColor: lighter
+				strokeColor: color
+				pointColor: color
+				pointStrokeColor: "white"
+				pointHighlightFill: "white"
+				pointHighlightStroke: color
 
 		if @currentChart
 			@currentChart.destroy()
-
 		ctx = @timeline.getContext("2d")
 		@chart = new Chart(ctx)
 		@currentChart = @chart.Line
 			labels: labels
-			datasets: [
-				label: "Logs"
-				data: values
-			]
+			datasets: datasets
 
 	render: ->
 		<div>
@@ -516,7 +550,7 @@ Views.Devices = React.createClass
 				if @props.devices?.length
 					<div>
 						<DevicesGraph appId={@props.appId}/>
-						<Templates.Table headers={["Id", "Browser", "Size", "Roles", "Connected devices", "Last updated"]}>
+						<Templates.Table headers={["Id", "Browser", "Size, deviceXDPI, logicalXDPI", "Roles", "Connected devices", "Last updated"]}>
 							{
 								for device, i in @props.devices
 									<tr key={i}>
@@ -525,7 +559,7 @@ Views.Devices = React.createClass
 										<td>
 											{
 												if device.width? or device.height?
-													<span>{device.width}x{device.height}</span>
+													<span>{device.width}x{device.height}, {device.deviceXDPI}, {device.logicalXDPI} </span>
 											}
 											{
 												if device.minWidth != device.maxWidth or device.minHeight != device.maxHeight
@@ -578,7 +612,7 @@ Views.Logs = React.createClass
 								<tr key={i}>
 									<td>{moment(l.loggedAt).format('YYYY-MM-DD HH:mm:ss:SSS')}</td>
 									<td>{l.device.id}</td>
-									<td>{l.device.os}, {l.device.browser} {l.device.browserVersion} ({l.device.width}x{l.device.height})</td>
+									<td>{l.device.os}, {l.device.browser}, {l.device.browserVersion}, {l.deviceType()} ({l.device.width}x{l.device.height}, {l.device.pixelRatio}) </td>
 									<td>{l.userIdentifier}</td>
 									<td>{l.location}</td>
 									<td>{l.type}</td>

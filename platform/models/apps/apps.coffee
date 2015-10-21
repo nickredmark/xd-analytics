@@ -1,7 +1,5 @@
 @Apps = new Mongo.Collection "apps"
 
-Users.attachSchema Schemas.User
-
 Schemas.App = new SimpleSchema
 	name:
 		type: String

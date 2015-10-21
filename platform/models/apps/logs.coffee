@@ -25,6 +25,10 @@ Schemas.DeviceState = new SimpleSchema
 	os:
 		type: String
 		optional: true
+	pixelRatio:
+		type: Number
+		decimal: true
+		optional: true
 
 Schemas.Log = new SimpleSchema
 	userIdentifier:
@@ -62,6 +66,24 @@ Schemas.Log = new SimpleSchema
 		type: [String]
 
 Logs.attachSchema Schemas.Log
+
+Logs.helpers
+	deviceDiam: ->
+		Math.sqrt @device.width*@device.width + @device.height*@device.height
+	deviceType: ->
+		if @device.pixelRatio
+			realDiam = @deviceDiam() / @device.pixelRatio
+		else
+			realDiam = @deviceDiam()
+		if realDiam > 1800
+			"xl"
+		else if realDiam > 1150
+			"lg"
+		else if realDiam > 500
+			"md"
+		else
+			"sm"
+
 
 Schemas.Device = new SimpleSchema
 	id:

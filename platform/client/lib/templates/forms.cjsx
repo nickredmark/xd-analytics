@@ -5,6 +5,12 @@ Templates.FormGroup = React.createClass
 			{@props.children}
 		</div>
 
+Templates.Text = React.createClass
+	render: ->
+		<Templates.FormGroup label={@props.label} id={@props.id}>
+			<input id="username" value={@props.value} onChange={@props.onChange} placeholder={@props.placeholder} className="form-control"/>
+		</Templates.FormGroup>
+
 Templates.Textarea = React.createClass
 	render: ->
 		<Templates.FormGroup label={@props.label} id={@props.id}>
