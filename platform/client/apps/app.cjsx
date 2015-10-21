@@ -132,7 +132,7 @@ Views.Timeline = React.createClass
 		views: "Page views"
 		logins: "Logins"
 		uniquePages: "Unique page views"
-		maxDevices: "Max devices per user"
+		devicesPerUser: "Devices per user"
 		browsers: "Browsers"
 		browserVersions: "Browser versions"
 		oses: "Operating systems"
@@ -177,11 +177,11 @@ Views.Timeline = React.createClass
 		date = (point) ->
 			point.loggedAt
 
+		transform = (map) ->
+			map
+
 		reduce = (value) ->
-			if value?
-				value
-			else
-				0
+			value
 
 		switch @state.display
 			when "logs"
@@ -190,7 +190,7 @@ Views.Timeline = React.createClass
 						map["Logs"] = 1
 					else
 						map["Logs"]++
-				@lineChart logs, date, assign, reduce
+				@lineChart logs, date, assign, transform, reduce
 
 			when "users"
 				assign = (map, element) ->
@@ -199,7 +199,7 @@ Views.Timeline = React.createClass
 					map["Users"][element.userIdentifier] = 1
 				reduce = (value) ->
 					Object.keys(value).length
-				@lineChart logs, date, assign, reduce
+				@lineChart logs, date, assign, transform, reduce
 
 			when "devices"
 				assign = (map, element) ->
@@ -208,7 +208,7 @@ Views.Timeline = React.createClass
 					map["Devices"][element.device.id] = 1
 				reduce = (value) ->
 					Object.keys(value).length
-				@lineChart logs, date, assign, reduce
+				@lineChart logs, date, assign, transform, reduce
 
 			when "views"
 				assign = (map, element) ->
@@ -216,7 +216,7 @@ Views.Timeline = React.createClass
 						map["Views"] = 1
 					else
 						map["Views"]++
-				@lineChart logs, date, assign, reduce
+				@lineChart logs, date, assign, transform, reduce
 
 			when "uniquePages"
 				assign = (map, element) ->
@@ -226,7 +226,7 @@ Views.Timeline = React.createClass
 						map["Pages"][element.location] = 1
 				reduce = (value) ->
 					Object.keys(value).length
-				@lineChart logs, date, assign, reduce
+				@lineChart logs, date, assign, transform, reduce
 
 			when "logins"
 				assign = (map, element) ->
@@ -238,7 +238,7 @@ Views.Timeline = React.createClass
 						if not map["Logouts"]
 							map["Logouts"] = 0
 						map["Logouts"]++
-				@lineChart logs, date, assign, reduce
+				@lineChart logs, date, assign, transform, reduce
 
 			when "devicesPerUser"
 				assign = (map, element) ->
@@ -246,10 +246,16 @@ Views.Timeline = React.createClass
 						if not map[element.userIdentifier]
 							map[element.userIdentifier] = {}
 						map[element.userIdentifier][element.device.id] = 1
-				# TODO transform
-				reduce = (value) ->
-						Object.keys(value).length
-				@lineChart logs, date, combine, reduce
+				transform = (map) ->
+					byNumber = {}
+					for user, devices of map
+						number = Object.keys(devices).length
+						if not byNumber[number]
+							byNumber[number] = 1
+						else
+							byNumber[number]++
+					byNumber
+				@lineChart logs, date, assign, transform, reduce
 
 			when "browsers"
 				key = (element) ->
@@ -361,7 +367,7 @@ Views.Timeline = React.createClass
 		buckets.push moment(current)
 
 		[labels, buckets]
-	lineChart: (data, date, assign, reduce) ->
+	lineChart: (data, date, assign, transform, reduce) ->
 		if not data
 			return
 
@@ -398,10 +404,12 @@ Views.Timeline = React.createClass
 		datasetsMap = {}
 		# Reduce
 		for map, i in values
-			for key, value of map
-				if not datasetsMap[key]
-					datasetsMap[key] = []
-				datasetsMap[key][i] = reduce(value)
+			if map
+				map = transform(map)
+				for key, value of map
+					if not datasetsMap[key]
+						datasetsMap[key] = []
+					datasetsMap[key][i] = reduce(value)
 
 		if not Object.keys(datasetsMap).length
 			datasetsMap["No Data"] = {}
