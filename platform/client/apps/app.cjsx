@@ -260,52 +260,61 @@ Views.Timeline = React.createClass
 			when "browsers"
 				key = (element) ->
 					element.device.browser
-				filter = (element) ->
-					element.type in ["connected"]
-				@pieChart logs, key, filter
+				assign = (map, element) ->
+					map[element.device.id] = 1
+				transform = (map) ->
+					Object.keys(map).length
+				@pieChart logs, key, assign, transform
 
 			when "browserVersions"
 				key = (element) ->
 					"#{element.device.browser} #{element.device.browserVersion}"
-				filter = (element) ->
-					element.type in ["connected"]
-				@pieChart logs, key, filter
+				assign = (map, element) ->
+					map[element.device.id] = 1
+				transform = (map) ->
+					Object.keys(map).length
+				@pieChart logs, key, assign, transform
 
 			when "oses"
 				key = (element) ->
 					element.device.os
-				filter = (element) ->
-					element.type in ["connected"]
-				@pieChart logs, key, filter
+				assign = (map, element) ->
+					map[element.device.id] = 1
+				transform = (map) ->
+					Object.keys(map).length
+				@pieChart logs, key, assign, transform
 
 			when "pages"
 				key = (element) ->
 					element.location
-				filter = (element) ->
-					element.type in ["connected", "location"]
-				@pieChart logs, key, filter
+				assign = (map, element) ->
+					map[element.device.id] = 1
+				transform = (map) ->
+					Object.keys(map).length
+				@pieChart logs, key, assign, transform
 
 			when "deviceTypes"
 				key = (element) ->
 					element.deviceType()
-				filter = (element) ->
-					element.type in ["connected"]
-				@pieChart logs, key, filter
+				assign = (map, element) ->
+					map[element.device.id] = 1
+				transform = (map) ->
+					Object.keys(map).length
+				@pieChart logs, key, assign, transform
 
-	pieChart: (data, key, filter) ->
+	pieChart: (data, key, assign, transform) ->
 		i = 0
 		buckets = {}
 		while i < data.length
 			k = key(data[i])
-			if filter(data[i])
-				if not buckets[k]
-					buckets[k] = 1
-				else
-					buckets[k]++
+			if not buckets[k]
+				buckets[k] = {}
+			assign(buckets[k], data[i])
 			i++
 
 		values = []
-		for label, count of buckets
+		for label, value of buckets
+			count = transform(value)
 
 			[color, highlight] = @colorPair 1
 			values.push
