@@ -281,7 +281,7 @@ Views.Timeline = React.createClass
 					time = 0
 					for device, history of map["Time online"]
 						for interval in history
-							time += interval.end.diff(moment(interval.start).add(10, 'seconds'), 'minutes', true)
+							time += interval.end.add(10, 'seconds').diff(moment(interval.start), 'minutes', true)
 					"Time online": time
 				@lineChart logs, date, assign, transform, reduce
 
