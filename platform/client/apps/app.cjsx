@@ -348,13 +348,23 @@ Views.Timeline = React.createClass
 				@pieChart logs, key, assign, transform
 
 			when "deviceTypes"
+				deviceTypes = {}
+				for l in logs
+					if not deviceTypes[l.device.id]
+						deviceTypes[l.device.id] = {}
+					deviceTypes[l.device.id][l.deviceType()] = 1
+
+				deviceTypesList = for key, value of deviceTypes
+					device: key
+					types: value
+
 				key = (element) ->
-					element.deviceType()
+					Object.keys(element.types).sort().join()
 				assign = (map, element) ->
-					map[element.device.id] = 1
+					map[element.device] = 1
 				transform = (map) ->
 					Object.keys(map).length
-				@pieChart logs, key, assign, transform
+				@pieChart deviceTypesList, key, assign, transform
 
 			when "deviceTypeCombinations"
 				userDevices = {}
