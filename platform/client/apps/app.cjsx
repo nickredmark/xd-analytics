@@ -276,12 +276,12 @@ Views.Timeline = React.createClass
 						history = map["Time online"][element.device.id]
 						timeout = moment(history[history.length-1].end).add(5, 'minutes')
 						if current < timeout
-							history[history.length-1].end = timeout
+							history[history.length-1].end = current
 				transform = (map) ->
 					time = 0
 					for device, history of map["Time online"]
 						for interval in history
-							time += interval.end.add(10, 'seconds').diff(moment(interval.start), 'minutes', true)
+							time += interval.end.add(10, 'seconds').diff(interval.start, 'minutes', true)
 					"Time online": time
 				@lineChart logs, date, assign, transform, reduce
 
