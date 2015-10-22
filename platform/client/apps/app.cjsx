@@ -139,6 +139,7 @@ Views.Timeline = React.createClass
 		oses: "Operating systems"
 		pages: "Pages"
 		deviceTypes: "Device types"
+		deviceTypeCombinations: "Device type combinations"
 	granularities:
 		auto: "Auto"
 		hour: "Hour"
@@ -355,15 +356,39 @@ Views.Timeline = React.createClass
 					Object.keys(map).length
 				@pieChart logs, key, assign, transform
 
+			when "deviceTypeCombinations"
+				userDevices = {}
+				for l in logs
+					if l.userIdentifier
+						if not userDevices[l.userIdentifier]
+							userDevices[l.userIdentifier] = {}
+						userDevices[l.userIdentifier][l.deviceType()] = 1
+
+				userDevicesList = for key, value of userDevices
+					user: key
+					devices: value
+
+				log userDevicesList
+
+				key = (element) ->
+					Object.keys(element.devices).sort().join()
+				assign = (map, element) ->
+					if not map.value
+						map.value = 1
+					else
+						map.value++
+				transform = (map) ->
+					map.value
+				@pieChart userDevicesList, key, assign, transform
+
 	pieChart: (data, key, assign, transform) ->
 		i = 0
 		buckets = {}
-		while i < data.length
-			k = key(data[i])
+		for l in data
+			k = key(l)
 			if not buckets[k]
 				buckets[k] = {}
-			assign(buckets[k], data[i])
-			i++
+			assign(buckets[k], l)
 
 		values = []
 		for label, value of buckets
