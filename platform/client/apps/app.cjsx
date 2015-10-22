@@ -138,10 +138,17 @@ Views.Timeline = React.createClass
 		oses: "Operating systems"
 		pages: "Pages"
 		deviceTypes: "Device types"
+	granularities:
+		auto: "Auto"
+		hour: "Hour"
+		day: "Day"
+		week: "Week"
+		month: "Month"
 	getInitialState: ->
 		from: moment().subtract(7, 'days').toDate()
 		to: new Date()
 		display: 'logs'
+		granularity: 'auto'
 	componentDidMount: ->
 		@timeline = document.getElementById("timeline")
 
@@ -350,14 +357,17 @@ Views.Timeline = React.createClass
 		from = moment(@state.from)
 		to = moment(@state.to)
 
-		if to.diff(from, 'weeks') > 40
-			granularity = 'month'
-		else if to.diff(from, 'days') > 40
-			granularity = 'week'
-		else if to.diff(from, 'hours') > 40
-			granularity = 'day'
+		if @state.granularity is "auto"
+			if to.diff(from, 'weeks') > 50
+				granularity = 'month'
+			else if to.diff(from, 'days') > 50
+				granularity = 'week'
+			else if to.diff(from, 'hours') > 50
+				granularity = 'day'
+			else
+				granularity = 'hour'
 		else
-			granularity = 'hour'
+			granularity = @state.granularity
 
 		# Create buckets
 
@@ -454,10 +464,16 @@ Views.Timeline = React.createClass
 			<div className="col-xs-12">
 				<h2>Timeline</h2>
 			</div>
-			<div className="col-xs-12 col-sm-6">
+			<div className="col-xs-12 col-sm-4">
 				<Templates.DateRangeInput id="range" label="Time range" from={@state.from} to={@state.to} onChange={@updateRange('from', 'to')}/>
 			</div>
-			<div className="col-xs-12 col-sm-6">
+			{
+				if false
+					<div className="col-xs-12 col-sm-4">
+						<Templates.Select id="display" label="Granularity" options={@granularities} value={@state.granularity} onChange={@updateValue('granularity')}/>
+					</div>
+			}
+			<div className="col-xs-12 col-sm-4">
 				<Templates.Select id="display" label="Data" options={@displays} value={@state.display} onChange={@updateValue('display')}/>
 			</div>
 			<div className="col-xs-12">
