@@ -283,7 +283,7 @@ Views.Timeline = React.createClass
 					for device, history of map["Time online"]
 						for interval in history
 							time += interval.end.add(10, 'seconds').diff(interval.start, 'minutes', true)
-					"Time online": time
+					"Time online": time.toFixed(2)
 				@lineChart logs, date, assign, transform, reduce
 
 
@@ -307,7 +307,7 @@ Views.Timeline = React.createClass
 					for device, history of map["Time online"]
 						for interval in history
 							time += interval.end.add(10, 'seconds').diff(interval.start, 'minutes', true)
-					"Time online": time / Object.keys(map["Time online"]).length
+					"Time online": (time / Object.keys(map["Time online"]).length).toFixed(2)
 				@lineChart logs, date, assign, transform, reduce
 
 			when "browsers"
