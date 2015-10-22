@@ -128,6 +128,7 @@ Views.Timeline = React.createClass
 	displays:
 		users: "Users and devices"
 		timeOnline: "Time online"
+		averageTimeOnline: "Average time online"
 		devicesPerUser: "Devices per user"
 		logs: "Number of logs"
 		views: "Page views"
@@ -283,6 +284,30 @@ Views.Timeline = React.createClass
 						for interval in history
 							time += interval.end.add(10, 'seconds').diff(interval.start, 'minutes', true)
 					"Time online": time
+				@lineChart logs, date, assign, transform, reduce
+
+
+			when "averageTimeOnline"
+				assign = (map, element) ->
+					if not map["Time online"]
+						map["Time online"] = {}
+					if not map["Time online"][element.device.id]
+						map["Time online"][element.device.id] = [
+							start: moment(element.loggedAt)
+							end: moment(element.loggedAt)
+						]
+					else
+						current = moment(element.loggedAt)
+						history = map["Time online"][element.device.id]
+						timeout = moment(history[history.length-1].end).add(5, 'minutes')
+						if current < timeout
+							history[history.length-1].end = current
+				transform = (map) ->
+					time = 0
+					for device, history of map["Time online"]
+						for interval in history
+							time += interval.end.add(10, 'seconds').diff(interval.start, 'minutes', true)
+					"Time online": time / Object.keys(map["Time online"]).length
 				@lineChart logs, date, assign, transform, reduce
 
 			when "browsers"
