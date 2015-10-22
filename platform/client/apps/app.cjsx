@@ -372,7 +372,9 @@ Views.Timeline = React.createClass
 					if l.userIdentifier
 						if not userDevices[l.userIdentifier]
 							userDevices[l.userIdentifier] = {}
-						userDevices[l.userIdentifier][l.deviceType()] = 1
+						if not userDevices[l.userIdentifier][l.device.id]
+							userDevices[l.userIdentifier][l.device.id] = {}
+						userDevices[l.userIdentifier][l.device.id][l.deviceType()] = 1
 
 				userDevicesList = for key, value of userDevices
 					user: key
@@ -381,7 +383,9 @@ Views.Timeline = React.createClass
 				log userDevicesList
 
 				key = (element) ->
-					Object.keys(element.devices).sort().join()
+					combination = for key, value of element.devices
+						Object.keys(value).sort().join()
+					combination.sort().join(";")
 				assign = (map, element) ->
 					if not map.value
 						map.value = 1
