@@ -126,13 +126,13 @@ Views.Overview = React.createClass
 Views.Timeline = React.createClass
 	mixins: [ReactMeteorData, ReactUtils]
 	displays:
-		logs: "Number of logs"
-		users: "Users"
-		devices: "Devices"
-		views: "Page views"
-		logins: "Logins"
-		uniquePages: "Unique page views"
+		users: "Users and devices"
+		timeOnline: "Time online"
 		devicesPerUser: "Devices per user"
+		logs: "Number of logs"
+		views: "Page views"
+		uniquePages: "Unique page views"
+		logins: "Logins"
 		browsers: "Browsers"
 		browserVersions: "Browser versions"
 		oses: "Operating systems"
@@ -147,7 +147,7 @@ Views.Timeline = React.createClass
 	getInitialState: ->
 		from: moment().subtract(7, 'days').toDate()
 		to: new Date()
-		display: 'logs'
+		display: 'users'
 		granularity: 'auto'
 	componentDidMount: ->
 		@timeline = document.getElementById("timeline")
@@ -201,16 +201,10 @@ Views.Timeline = React.createClass
 
 			when "users"
 				assign = (map, element) ->
-					if not map.Users
+					if not map["Users"]
 						map["Users"] = {}
 					map["Users"][element.userIdentifier] = 1
-				reduce = (value) ->
-					Object.keys(value).length
-				@lineChart logs, date, assign, transform, reduce
-
-			when "devices"
-				assign = (map, element) ->
-					if not map.Devices
+					if not map["Devices"]
 						map["Devices"] = {}
 					map["Devices"][element.device.id] = 1
 				reduce = (value) ->
@@ -257,11 +251,37 @@ Views.Timeline = React.createClass
 					byNumber = {}
 					for user, devices of map
 						number = Object.keys(devices).length
-						if not byNumber[number]
-							byNumber[number] = 1
+						if number is 1
+							key = "1 device"
 						else
-							byNumber[number]++
+							key = "#{number} devices"
+						if not byNumber[key]
+							byNumber[key] = 1
+						else
+							byNumber[key]++
 					byNumber
+				@lineChart logs, date, assign, transform, reduce
+
+			when "timeOnline"
+				assign = (map, element) ->
+					if not map["Time online"]
+						map["Time online"] = {}
+					if not map["Time online"][element.device.id]
+						map["Time online"][element.device.id] = [
+							start: moment(element.loggedAt)
+							end: moment(element.loggedAt).add(5, 'minutes')
+						]
+					else
+						current = moment(element.loggedAt)
+						history = map["Time online"][element.device.id]
+						if current < history[history.length-1].end
+							history[history.length-1].end = current.add(5, 'minutes')
+				transform = (map) ->
+					time = 0
+					for device, history of map["Time online"]
+						for interval in history
+							time += interval.end.diff(interval.start, 'minutes', true)
+					"Time online": time
 				@lineChart logs, date, assign, transform, reduce
 
 			when "browsers"
@@ -458,6 +478,8 @@ Views.Timeline = React.createClass
 		@currentChart = @chart.Line
 			labels: labels
 			datasets: datasets
+		,
+			multiTooltipTemplate: "<%= datasetLabel %> - <%= value %>"
 
 	render: ->
 		<div>
