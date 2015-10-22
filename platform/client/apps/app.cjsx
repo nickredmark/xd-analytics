@@ -269,13 +269,13 @@ Views.Timeline = React.createClass
 					if not map["Time online"][element.device.id]
 						map["Time online"][element.device.id] = [
 							start: moment(element.loggedAt)
-							end: moment(element.loggedAt).add(1, 'minutes')
+							end: moment(element.loggedAt).add(0.5, 'minutes')
 						]
 					else
 						current = moment(element.loggedAt)
 						history = map["Time online"][element.device.id]
 						if current < history[history.length-1].end
-							history[history.length-1].end = current.add(1, 'minutes')
+							history[history.length-1].end = current.add(0.5, 'minutes')
 				transform = (map) ->
 					time = 0
 					for device, history of map["Time online"]
