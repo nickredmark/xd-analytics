@@ -142,7 +142,6 @@ Views.Timeline = React.createClass
 		deviceTypeCombinations: "Device type combinations"
 	granularities:
 		auto: "Auto"
-		hour: "Hour"
 		day: "Day"
 		week: "Week"
 		month: "Month"
@@ -554,12 +553,9 @@ Views.Timeline = React.createClass
 			<div className="col-xs-12 col-sm-4">
 				<Templates.DateRangeInput id="range" label="Time range" from={@state.from} to={@state.to} onChange={@updateRange('from', 'to')}/>
 			</div>
-			{
-				if false
-					<div className="col-xs-12 col-sm-4">
-						<Templates.Select id="display" label="Granularity" options={@granularities} value={@state.granularity} onChange={@updateValue('granularity')}/>
-					</div>
-			}
+			<div className="col-xs-12 col-sm-4">
+				<Templates.Select id="display" label="Granularity" options={@granularities} value={@state.granularity} onChange={@updateValue('granularity')}/>
+			</div>
 			<div className="col-xs-12 col-sm-4">
 				<Templates.Select id="display" label="Data" options={@displays} value={@state.display} onChange={@updateValue('display')}/>
 			</div>
