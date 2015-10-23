@@ -198,7 +198,7 @@ Views.Timeline = React.createClass
 
 		if allLogs
 			usersMap = {}
-			for l in logs
+			for l in allLogs
 				if l.userIdentifier
 					usersMap[l.userIdentifier] = 1
 
