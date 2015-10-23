@@ -180,6 +180,12 @@ Views.Timeline = React.createClass
 			find.loggedAt.$gte = @state.from
 		if @state.to
 			find.loggedAt.$lte = @state.to
+
+		allLogs = Logs.find find,
+				sort:
+					loggedAt: 1
+			.fetch()
+
 		if @state.user
 			find.userIdentifier = @state.user
 
@@ -190,7 +196,7 @@ Views.Timeline = React.createClass
 
 		@update logs
 
-		if logs
+		if allLogs
 			usersMap = {}
 			for l in logs
 				if l.userIdentifier
@@ -198,6 +204,7 @@ Views.Timeline = React.createClass
 
 			users = (key for key of usersMap)
 
+		allLogs: allLogs
 		logs: logs
 		users: users
 	timeline: null
@@ -585,6 +592,8 @@ Views.Timeline = React.createClass
 		,
 			multiTooltipTemplate: "<%= datasetLabel %> - <%= value %>"
 
+	getStyle: ->
+		display: (if @state.mode is "user" and not @state.user then "none" else "block")
 	render: ->
 		<div>
 			<div className="col-xs-12">
@@ -600,7 +609,7 @@ Views.Timeline = React.createClass
 			</div>
 			<div className="col-xs-12">
 				<div id="timeline-wrapper">
-					<canvas id="timeline"></canvas>
+					<canvas id="timeline" style={@getStyle()}></canvas>
 				</div>
 				{
 					if @state.mode is "user"
@@ -608,7 +617,7 @@ Views.Timeline = React.createClass
 							{
 								for user, i in @data.users
 									<li key={i}>
-										<a onClick={@setValue('user', user)}>{user}</a>
+										<a onClick={@setValue('user', user)} style={{fontWeight: (if user is @state.user then "bold" else "normal")}}>{user}</a>
 									</li>
 							}
 						</ul>
