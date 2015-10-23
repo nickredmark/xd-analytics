@@ -465,7 +465,7 @@ Views.Timeline = React.createClass
 		formats =
 			month: "MMMM"
 			week: "w"
-			day: "D"
+			day: "dd D"
 			hour: "H:00"
 		labels = (point.format(formats[granularity]) for point in buckets)
 		buckets.push moment(current)
