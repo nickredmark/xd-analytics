@@ -200,9 +200,16 @@ Views.Timeline = React.createClass
 			usersMap = {}
 			for l in allLogs
 				if l.userIdentifier
-					usersMap[l.userIdentifier] = 1
+					if not usersMap[l.userIdentifier]
+						usersMap[l.userIdentifier] =
+							devices: {}
+					usersMap[l.userIdentifier].devices[l.device.id] = 1
 
-			users = (key for key of usersMap)
+			users = for id, data of usersMap
+				id: id
+				data: data
+			users.sort (u1, u2) ->
+				Object.keys(u1.data.devices).length <= Object.keys(u2.data.devices).length
 
 		allLogs: allLogs
 		logs: logs
@@ -415,8 +422,6 @@ Views.Timeline = React.createClass
 							user: key
 							devices: value
 
-						log userDevicesList
-
 						key = (element) ->
 							combination = for key, value of element.devices
 								Object.keys(value).sort().join()
@@ -433,12 +438,11 @@ Views.Timeline = React.createClass
 			when "user"
 				switch @state.display[@state.mode]
 					when "logs"
-						log "hiii"
 						assign = (map, element) ->
-							if not map["Logs"]
-								map["Logs"] = 1
+							if not map[element.device.id]
+								map[element.device.id] = 1
 							else
-								map["Logs"]++
+								map[element.device.id]++
 						@lineChart logs, date, assign, transform, reduce
 
 	pieChart: (data, key, assign, transform) ->
@@ -613,14 +617,23 @@ Views.Timeline = React.createClass
 				</div>
 				{
 					if @state.mode is "user"
-						<ul>
+						<Templates.Table headers={["User", "Devices"]}>
 							{
 								for user, i in @data.users
-									<li key={i}>
-										<a onClick={@setValue('user', user)} style={{fontWeight: (if user is @state.user then "bold" else "normal")}}>{user}</a>
-									</li>
+									<tr key={i}>
+										<td>
+											<a onClick={@setValue('user', user.id)} style={{fontWeight: (if user.id is @state.user then "bold" else "normal")}}>{user.id}</a>
+										</td>
+										<td>
+											{
+												for device of user.data.devices
+
+													<span key={device}>{device} </span>
+											}
+										</td>
+									</tr>
 							}
-						</ul>
+						</Templates.Table>
 				}
 			</div>
 		</div>
