@@ -353,9 +353,9 @@ Views.Timeline = React.createClass
 								time = 0
 								for interval in data.history
 									time += interval.end.add(10, 'seconds').diff(interval.start, 'minutes', true)
-								byDeviceType[data.type] = time
+								byDeviceType[Object.keys(data.type).sort().join()] = time
 
-							byDeviceType
+							log byDeviceType
 						@lineChart logs, date, assign, transform, reduce
 
 					when "averageTimeOnline"
@@ -423,7 +423,6 @@ Views.Timeline = React.createClass
 							if not deviceTypes[l.device.id]
 								deviceTypes[l.device.id] = {}
 							deviceTypes[l.device.id][l.deviceType()] = 1
-
 						deviceTypesList = for key, value of deviceTypes
 							device: key
 							types: value
