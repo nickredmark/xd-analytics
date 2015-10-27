@@ -132,6 +132,7 @@ Views.Timeline = React.createClass
 	displays:
 		global:
 			users: "Users and devices"
+			usersByDeviceType: "Users by device type"
 			timeOnline: "Time online"
 			timeOnlineByDeviceType: "Time online by device type"
 			averageTimeOnline: "Average time online"
@@ -246,14 +247,31 @@ Views.Timeline = React.createClass
 
 					when "users"
 						assign = (map, element) ->
-							if not map["Users"]
-								map["Users"] = {}
-							map["Users"][element.userIdentifier] = 1
+							if element.userIdentifier
+								if not map["Users"]
+									map["Users"] = {}
+								map["Users"][element.userIdentifier] = 1
 							if not map["Devices"]
 								map["Devices"] = {}
 							map["Devices"][element.device.id] = 1
 						reduce = (value) ->
 							Object.keys(value).length
+						@lineChart logs, date, assign, transform, reduce
+
+					when "usersByDeviceType"
+						assign = (map, element) ->
+							if element.userIdentifier
+								if not map[element.userIdentifier]
+									map[element.userIdentifier] = {}
+								map[element.userIdentifier][element.deviceType()] = 1
+						transform = (map) ->
+							byDeviceType = {}
+							for user, types of map
+								for deviceType, one of types
+									if not byDeviceType[deviceType]
+										byDeviceType[deviceType] = 0
+									byDeviceType[deviceType]++
+							byDeviceType
 						@lineChart logs, date, assign, transform, reduce
 
 					when "views"
@@ -355,7 +373,7 @@ Views.Timeline = React.createClass
 									time += interval.end.add(10, 'seconds').diff(interval.start, 'minutes', true)
 								byDeviceType[Object.keys(data.type).sort().join()] = time
 
-							log byDeviceType
+							byDeviceType
 						@lineChart logs, date, assign, transform, reduce
 
 					when "averageTimeOnline"
