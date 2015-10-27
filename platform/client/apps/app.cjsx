@@ -133,6 +133,7 @@ Views.Timeline = React.createClass
 		global:
 			users: "Users and devices"
 			timeOnline: "Time online"
+			timeOnlineByDeviceType: "Time online by device type"
 			averageTimeOnline: "Average time online"
 			devicesPerUser: "Devices per user"
 			logs: "Number of logs"
@@ -329,6 +330,33 @@ Views.Timeline = React.createClass
 							"Time online": time.toFixed(2)
 						@lineChart logs, date, assign, transform, reduce
 
+					when "timeOnlineByDeviceType"
+						assign = (map, element) ->
+							if not map[element.device.id]
+								map[element.device.id] =
+									type: {}
+									history: [
+										start: moment(element.loggedAt)
+										end: moment(element.loggedAt)
+									]
+							else
+								current = moment(element.loggedAt)
+								history = map[element.device.id].history
+								timeout = moment(history[history.length-1].end).add(5, 'minutes')
+								if current < timeout
+									history[history.length-1].end = current
+							map[element.device.id].type[element.deviceType()] = 1
+						transform = (map) ->
+							byDeviceType = {}
+
+							for device, data of map
+								time = 0
+								for interval in data.history
+									time += interval.end.add(10, 'seconds').diff(interval.start, 'minutes', true)
+								byDeviceType[data.type] = time
+
+							byDeviceType
+						@lineChart logs, date, assign, transform, reduce
 
 					when "averageTimeOnline"
 						assign = (map, element) ->
@@ -595,6 +623,7 @@ Views.Timeline = React.createClass
 			datasets: datasets
 		,
 			multiTooltipTemplate: "<%= datasetLabel %> - <%= value %>"
+			bezierCurve: false
 
 	getStyle: ->
 		display: (if @state.mode is "user" and not @state.user then "none" else "block")
