@@ -63,7 +63,7 @@ nicolaslopezj:roles
 
 # Styling
 twbs:bootstrap
-fourseven:scss
+fourseven:scss@=3.2.0
 
 # Libraries and utilities
 d3js:d3
