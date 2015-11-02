@@ -500,15 +500,22 @@ Views.Timeline = React.createClass
 			assign(buckets[k], l)
 
 		values = []
+
+		colors = @colorPairSeries Object.keys(buckets).length, 1
+		log colors
+
+		i = 0
 		for label, value of buckets
 			count = transform(value)
 
-			[color, highlight] = @colorPair 1
+			[color, highlight] = colors[i]
 			values.push
 				value: count
 				label: label
 				color: color
 				highlight: highlight
+
+			i++
 
 		values.sort (a, b) ->
 			a.value <= b.value
@@ -529,6 +536,28 @@ Views.Timeline = React.createClass
 
 			["rgba(#{color[0]},#{color[1]},#{color[2]},1)", "rgba(#{highlight[0]},#{highlight[1]},#{highlight[2]},#{alpha})"]
 
+	colorPairSeries: (amount, alpha) ->
+
+		colors = []
+		i = 0
+
+		base = [Math.random()*100, Math.random()*100, Math.random()*100]
+
+		lighten = 20
+
+		max = 255 - 40
+
+		min = Math.max base[0], base[1], base[2]
+
+		gap = (max - min) / amount
+
+		while i < amount
+			color = [base[0] + i*gap, base[1] + i*gap, base[2] + i*gap]
+			highlight = [Math.min(color[0] + lighten, 255), Math.min(color[1] + lighten, 255), Math.min(color[2] + lighten, 255)]
+			colors[i] = ["rgba(#{Math.floor(color[0])},#{Math.floor(color[1])},#{Math.floor(color[2])},1)", "rgba(#{Math.floor(highlight[0])},#{Math.floor(highlight[1])},#{Math.floor(highlight[2])},#{alpha})"]
+			i++
+
+		colors
 
 	getBuckets: ->
 
@@ -573,7 +602,7 @@ Views.Timeline = React.createClass
 		if not @timeline
 			return
 
-		[labels, buckets, values] = @getBuckets()
+		[labels, buckets] = @getBuckets()
 
 		i = 0
 		# Discard all points earlier than buckets[0]
@@ -611,8 +640,12 @@ Views.Timeline = React.createClass
 					datasetsMap[key][i] = reduce(value)
 
 		if not Object.keys(datasetsMap).length
-			datasetsMap["No Data"] = {}
+			datasetsMap["No Data"] = []
 
+
+		colors = @colorPairSeries Object.keys(datasetsMap).length, 0.5
+
+		j = 0
 		datasets = []
 		for key, data of datasetsMap
 			i = 0
@@ -620,7 +653,7 @@ Views.Timeline = React.createClass
 				if not data[i]
 					data[i] = 0
 				i++
-			[color, lighter] = @colorPair(0.5)
+			[color, lighter] = colors[j]
 			datasets.push
 				label: key
 				data: data
@@ -630,6 +663,9 @@ Views.Timeline = React.createClass
 				pointStrokeColor: "white"
 				pointHighlightFill: "white"
 				pointHighlightStroke: color
+
+			j++
+
 
 		if @currentChart
 			@currentChart.destroy()
