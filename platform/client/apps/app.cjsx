@@ -186,16 +186,22 @@ Views.Timeline = React.createClass
 		granularity: 'auto'
 		user: null
 		device: null
-	load: ->
-		self = @
-		if @timeline
-			Meteor.call 'getAnalyticsValues', @props.appId, @view(), @state.from, @state.to, @state.granularity, (e, r) ->
-				checkError e
-				[labels, values] = r
-				self.update labels, values
 	componentDidMount: ->
 		@timeline = document.getElementById("timeline")
 		@load()
+	load: ->
+		self = @
+		if @timeline
+			switch @chartType[@view()]
+				when "line"
+					Meteor.call 'getAnalyticsValues', @props.appId, @view(), @state.from, @state.to, @state.granularity, (e, r) ->
+						checkError e
+						[labels, values] = r
+						self.lineChart labels, values
+				when "pie"
+					Meteor.call 'getAnalyticsValue', @props.appId, @view(), @state.from, @state.to, @state.granularity, (e, r) ->
+						checkError e
+						self.pieChart r
 	getMeteorData: ->
 
 		###
@@ -227,33 +233,16 @@ Views.Timeline = React.createClass
 
 	view: ->
 		"#{@state.mode}-#{@state.display[@state.mode]}"
-	update: (labels, values) ->
-		switch @chartType[@view()]
-			when "line"
-				@lineChart labels, values
-			when "pie"
-				@pieChart values
-
-	pieChart: (data, key, assign, transform) ->
-		i = 0
-		buckets = {}
-		for l in data
-			k = key(l)
-			if not buckets[k]
-				buckets[k] = {}
-			assign(buckets[k], l)
-
-		values = []
+	pieChart: (buckets) ->
 
 		colors = @colorPairSeries Object.keys(buckets).length, 1
 
 		i = 0
+		values = []
 		for label, value of buckets
-			count = transform(value)
-
 			[color, highlight] = colors[i]
 			values.push
-				value: count
+				value: value
 				label: label
 				color: color
 				highlight: highlight

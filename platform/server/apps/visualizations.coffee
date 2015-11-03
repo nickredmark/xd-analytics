@@ -1,57 +1,39 @@
-Meteor.methods
-
-	getAnalyticsValues: (appId, view, from, to, granularity) ->
-		[labels, buckets] = getBuckets from, to, granularity
-
-		values = {}
-		for label, i in labels
-			map = getValue appId, view, buckets[i].toDate(), buckets[i+1].toDate()
-			for key, value of map
-				if not values[key]
-					values[key] = []
-				values[key][i] = value
-
-		if not Object.keys(values).length
-			values["No Data"] = []
-
-		[labels, values]
-
-getValue = (appId, view, from, to) ->
-	caching = true
-	if caching
-		cache = Cache.findOne
-			appId: appId
-			view: view
-			from: from
-			to: to
-
-	if cache
-		cache.value
-	else
-
-		logs = Logs.find
-				appId: appId
-				loggedAt:
-					$gte: from
-					$lt: to
-			,
-				sort:
-					loggedAt: 1
-			.fetch()
-
-
-		value = computeValue logs, view
-
+getAnalyticsValue = (appId, view, from, to) ->
+		caching = true
 		if caching
-			if to < moment()
-				Cache.insert
-					appId: appId
-					view: view
-					from: from
-					to: to
-					value: value
+			cache = Cache.findOne
+				appId: appId
+				view: view
+				from: from
+				to: to
 
-		value
+		if cache
+			cache.value
+		else
+
+			logs = Logs.find
+					appId: appId
+					loggedAt:
+						$gte: from
+						$lt: to
+				,
+					sort:
+						loggedAt: 1
+				.fetch()
+
+
+			value = computeValue logs, view
+
+			if caching
+				if to < moment()
+					Cache.insert
+						appId: appId
+						view: view
+						from: from
+						to: to
+						value: value
+
+			value
 
 computeValue = (logs, view) ->
 
@@ -73,7 +55,6 @@ computeValue = (logs, view) ->
 				map["Devices"][element.device.id] = 1
 			reduce = (value) ->
 				Object.keys(value).length
-			value = process logs, assign, transform, reduce
 
 		when "global-usersByDeviceType"
 			assign = (map, element) ->
@@ -89,7 +70,6 @@ computeValue = (logs, view) ->
 							byDeviceType[deviceType] = 0
 						byDeviceType[deviceType]++
 				byDeviceType
-			value = process logs, assign, transform, reduce
 
 		when "global-timeOnline"
 			assign = (map, element) ->
@@ -112,7 +92,6 @@ computeValue = (logs, view) ->
 					for interval in history
 						time += interval.end.add(10, 'seconds').diff(interval.start, 'minutes', true)
 				"Time online": time.toFixed(2)
-			value = process logs, assign, transform, reduce
 
 		when "global-timeOnlineByDeviceType"
 			assign = (map, element) ->
@@ -140,7 +119,6 @@ computeValue = (logs, view) ->
 					byDeviceType[Object.keys(data.type).sort().join()] = time
 
 				byDeviceType
-			value = process logs, assign, transform, reduce
 
 		when "global-averageTimeOnline"
 			assign = (map, element) ->
@@ -169,7 +147,6 @@ computeValue = (logs, view) ->
 					nmap =
 						"Time online": 0
 				nmap
-			value = process logs, assign, transform, reduce
 
 		when "global-devicesPerUser"
 			assign = (map, element) ->
@@ -190,7 +167,6 @@ computeValue = (logs, view) ->
 					else
 						byNumber[key]++
 				byNumber
-			value = process logs, assign, transform, reduce
 
 		when "global-logs"
 			assign = (map, element) ->
@@ -198,7 +174,6 @@ computeValue = (logs, view) ->
 					map["Logs"] = 1
 				else
 					map["Logs"]++
-			value = process logs, assign, transform, reduce
 
 		when "global-views"
 			assign = (map, element) ->
@@ -206,7 +181,6 @@ computeValue = (logs, view) ->
 					map["Views"] = 1
 				else
 					map["Views"]++
-			value = process logs, assign, transform, reduce
 
 		when "global-uniquePages"
 			assign = (map, element) ->
@@ -216,7 +190,6 @@ computeValue = (logs, view) ->
 					map["Pages"][element.location] = 1
 			reduce = (value) ->
 				Object.keys(value).length
-			value = process logs, assign, transform, reduce
 
 		when "global-logins"
 			assign = (map, element) ->
@@ -228,11 +201,99 @@ computeValue = (logs, view) ->
 					if not map["Logouts"]
 						map["Logouts"] = 0
 					map["Logouts"]++
-			value = process logs, assign, transform, reduce
+
+		when "global-browsers"
+			assign = (map, element) ->
+				key = element.device.browser
+				if not map[key]
+					map[key] = {}
+				map[key][element.device.id] = 1
+			reduce = (value) ->
+				Object.keys(value).length
+
+		when "global-browserVersions"
+			assign = (map, element) ->
+				key = "#{element.device.browser} #{element.device.browserVersion}"
+				if not map[key]
+					map[key] = {}
+				map[key][element.device.id] = 1
+			reduce = (value) ->
+				Object.keys(value).length
+
+		when "global-oses"
+			assign = (map, element) ->
+				key = element.device.os
+				if not map[key]
+					map[key] = {}
+				map[key][element.device.id] = 1
+			reduce = (value) ->
+				Object.keys(value).length
+
+		when "global-pages"
+			assign = (map, element) ->
+				key = element.location
+				if not map[key]
+					map[key] = {}
+				map[key][element.device.id] = 1
+			reduce = (value) ->
+				Object.keys(value).length
+
+		when "global-deviceTypes"
+			deviceTypes = {}
+			for l in logs
+				if not deviceTypes[l.device.id]
+					deviceTypes[l.device.id] = {}
+				deviceTypes[l.device.id][l.deviceType()] = 1
+			deviceTypesList = for key, value of deviceTypes
+				device: key
+				types: value
+			logs = deviceTypesList
+
+			assign = (map, element) ->
+				log element
+				key = Object.keys(element.types).sort().join()
+				if not map[key]
+					map[key] = {}
+				map[key][element.device] = 1
+			reduce = (value) ->
+				Object.keys(value).length
+
+		when "global-deviceTypeCombinations"
+			userDevices = {}
+			for l in logs
+				if l.userIdentifier
+					if not userDevices[l.userIdentifier]
+						userDevices[l.userIdentifier] = {}
+					if not userDevices[l.userIdentifier][l.device.id]
+						userDevices[l.userIdentifier][l.device.id] = {}
+					userDevices[l.userIdentifier][l.device.id][l.deviceType()] = 1
+
+			userDevicesList = for key, value of userDevices
+				user: key
+				devices: value
+
+			logs = userDevicesList
+
+			assign = (map, element) ->
+				combination = for key, value of element.devices
+					Object.keys(value).sort().join()
+				key = combination.sort().join(";")
+				if not map[key]
+					map[key] = 1
+				else
+					map[key]++
+
+		when "user-logs"
+			assign = (map, element) ->
+				if not map[element.device.id]
+					map[element.device.id] = 1
+				else
+					map[element.device.id]++
 
 		else
 			throw new Error "Unknown view: #{view}"
 
+	value = process logs, assign, transform, reduce
 
 	value
 
@@ -282,3 +343,23 @@ process = (data, assign, transform, reduce) ->
 		map[key] = reduce value
 
 	map
+
+Meteor.methods
+
+	getAnalyticsValues: (appId, view, from, to, granularity) ->
+		[labels, buckets] = getBuckets from, to, granularity
+
+		values = {}
+		for label, i in labels
+			map = getAnalyticsValue appId, view, buckets[i].toDate(), buckets[i+1].toDate()
+			for key, value of map
+				if not values[key]
+					values[key] = []
+				values[key][i] = value
+
+		if not Object.keys(values).length
+			values["No Data"] = []
+
+		[labels, values]
+
+	getAnalyticsValue: getAnalyticsValue
