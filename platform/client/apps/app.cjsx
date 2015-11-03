@@ -129,6 +129,25 @@ Views.Timeline = React.createClass
 		global: "Global"
 		user: "User"
 		device: "Device"
+	chartType:
+		'global-users': 'line'
+		'global-usersByDeviceType': 'line'
+		'global-timeOnline': 'line'
+		'global-timeOnlineByDeviceType': 'line'
+		'global-averageTimeOnline': 'line'
+		'global-devicesPerUser': 'line'
+		'global-logs': 'line'
+		'global-views': 'line'
+		'global-uniquePages': 'line'
+		'global-logins': 'line'
+		'global-browsers': 'pie'
+		'global-browserVersions': 'pie'
+		'global-oses': 'pie'
+		'global-pages': 'pie'
+		'global-deviceTypes': 'pie'
+		'global-deviceTypeCombinations': 'pie'
+		'user-logs': 'line'
+		'device-logs': 'line'
 	displays:
 		global:
 			users: "Users and devices"
@@ -167,37 +186,19 @@ Views.Timeline = React.createClass
 		granularity: 'auto'
 		user: null
 		device: null
+	load: ->
+		self = @
+		if @timeline
+			Meteor.call 'getAnalyticsValues', @props.appId, @view(), @state.from, @state.to, @state.granularity, (e, r) ->
+				checkError e
+				[labels, values] = r
+				self.update labels, values
 	componentDidMount: ->
 		@timeline = document.getElementById("timeline")
-
-		if @data.logs
-			@update @data.logs
+		@load()
 	getMeteorData: ->
-		find =
-			appId: @props.appId
 
-		if @state.from or @state.to
-			find.loggedAt = {}
-		if @state.from
-			find.loggedAt.$gte = @state.from
-		if @state.to
-			find.loggedAt.$lte = @state.to
-
-		allLogs = Logs.find find,
-				sort:
-					loggedAt: 1
-			.fetch()
-
-		if @state.user
-			find.userIdentifier = @state.user
-
-		logs = Logs.find find,
-				sort:
-					loggedAt: 1
-			.fetch()
-
-		@update logs
-
+		###
 		if allLogs
 			usersMap = {}
 			for l in allLogs
@@ -216,279 +217,22 @@ Views.Timeline = React.createClass
 		allLogs: allLogs
 		logs: logs
 		users: users
+		###
+
+		{}
+
 	timeline: null
 	chart: null
 	currentChart: null
 
-	update: (logs) ->
-		if not logs
-			return
-
-		date = (point) ->
-			point.loggedAt
-
-		transform = (map) ->
-			map
-
-		reduce = (value) ->
-			value
-
-		switch @state.mode
-			when "global"
-
-				switch @state.display[@state.mode]
-					when "logs"
-						assign = (map, element) ->
-							if not map["Logs"]
-								map["Logs"] = 1
-							else
-								map["Logs"]++
-						@lineChart logs, date, assign, transform, reduce
-
-					when "users"
-						assign = (map, element) ->
-							if element.userIdentifier
-								if not map["Users"]
-									map["Users"] = {}
-								map["Users"][element.userIdentifier] = 1
-							if not map["Devices"]
-								map["Devices"] = {}
-							map["Devices"][element.device.id] = 1
-						reduce = (value) ->
-							Object.keys(value).length
-						@lineChart logs, date, assign, transform, reduce
-
-					when "usersByDeviceType"
-						assign = (map, element) ->
-							if element.userIdentifier
-								if not map[element.userIdentifier]
-									map[element.userIdentifier] = {}
-								map[element.userIdentifier][element.deviceType()] = 1
-						transform = (map) ->
-							byDeviceType = {}
-							for user, types of map
-								for deviceType, one of types
-									if not byDeviceType[deviceType]
-										byDeviceType[deviceType] = 0
-									byDeviceType[deviceType]++
-							byDeviceType
-						@lineChart logs, date, assign, transform, reduce
-
-					when "views"
-						assign = (map, element) ->
-							if not map["Views"]
-								map["Views"] = 1
-							else
-								map["Views"]++
-						@lineChart logs, date, assign, transform, reduce
-
-					when "uniquePages"
-						assign = (map, element) ->
-							if element.type in ["connected", "location"]
-								if not map["Pages"]
-									map["Pages"] = {}
-								map["Pages"][element.location] = 1
-						reduce = (value) ->
-							Object.keys(value).length
-						@lineChart logs, date, assign, transform, reduce
-
-					when "logins"
-						assign = (map, element) ->
-							if element.type in ["login"]
-								if not map["Logins"]
-									map["Logins"] = 0
-								map["Logins"]++
-							else if element.type in ["logout"]
-								if not map["Logouts"]
-									map["Logouts"] = 0
-								map["Logouts"]++
-						@lineChart logs, date, assign, transform, reduce
-
-					when "devicesPerUser"
-						assign = (map, element) ->
-							if element.userIdentifier
-								if not map[element.userIdentifier]
-									map[element.userIdentifier] = {}
-								map[element.userIdentifier][element.device.id] = 1
-						transform = (map) ->
-							byNumber = {}
-							for user, devices of map
-								number = Object.keys(devices).length
-								if number is 1
-									key = "1 device"
-								else
-									key = "#{number} devices"
-								if not byNumber[key]
-									byNumber[key] = 1
-								else
-									byNumber[key]++
-							byNumber
-						@lineChart logs, date, assign, transform, reduce
-
-					when "timeOnline"
-						assign = (map, element) ->
-							if not map["Time online"]
-								map["Time online"] = {}
-							if not map["Time online"][element.device.id]
-								map["Time online"][element.device.id] = [
-									start: moment(element.loggedAt)
-									end: moment(element.loggedAt)
-								]
-							else
-								current = moment(element.loggedAt)
-								history = map["Time online"][element.device.id]
-								timeout = moment(history[history.length-1].end).add(5, 'minutes')
-								if current < timeout
-									history[history.length-1].end = current
-						transform = (map) ->
-							time = 0
-							for device, history of map["Time online"]
-								for interval in history
-									time += interval.end.add(10, 'seconds').diff(interval.start, 'minutes', true)
-							"Time online": time.toFixed(2)
-						@lineChart logs, date, assign, transform, reduce
-
-					when "timeOnlineByDeviceType"
-						assign = (map, element) ->
-							if not map[element.device.id]
-								map[element.device.id] =
-									type: {}
-									history: [
-										start: moment(element.loggedAt)
-										end: moment(element.loggedAt)
-									]
-							else
-								current = moment(element.loggedAt)
-								history = map[element.device.id].history
-								timeout = moment(history[history.length-1].end).add(5, 'minutes')
-								if current < timeout
-									history[history.length-1].end = current
-							map[element.device.id].type[element.deviceType()] = 1
-						transform = (map) ->
-							byDeviceType = {}
-
-							for device, data of map
-								time = 0
-								for interval in data.history
-									time += interval.end.add(10, 'seconds').diff(interval.start, 'minutes', true)
-								byDeviceType[Object.keys(data.type).sort().join()] = time
-
-							byDeviceType
-						@lineChart logs, date, assign, transform, reduce
-
-					when "averageTimeOnline"
-						assign = (map, element) ->
-							if not map["Time online"]
-								map["Time online"] = {}
-							if not map["Time online"][element.device.id]
-								map["Time online"][element.device.id] = [
-									start: moment(element.loggedAt)
-									end: moment(element.loggedAt)
-								]
-							else
-								current = moment(element.loggedAt)
-								history = map["Time online"][element.device.id]
-								timeout = moment(history[history.length-1].end).add(5, 'minutes')
-								if current < timeout
-									history[history.length-1].end = current
-						transform = (map) ->
-							time = 0
-							for device, history of map["Time online"]
-								for interval in history
-									time += interval.end.add(10, 'seconds').diff(interval.start, 'minutes', true)
-							"Time online": (time / Object.keys(map["Time online"]).length).toFixed(2)
-						@lineChart logs, date, assign, transform, reduce
-
-					when "browsers"
-						key = (element) ->
-							element.device.browser
-						assign = (map, element) ->
-							map[element.device.id] = 1
-						transform = (map) ->
-							Object.keys(map).length
-						@pieChart logs, key, assign, transform
-
-					when "browserVersions"
-						key = (element) ->
-							"#{element.device.browser} #{element.device.browserVersion}"
-						assign = (map, element) ->
-							map[element.device.id] = 1
-						transform = (map) ->
-							Object.keys(map).length
-						@pieChart logs, key, assign, transform
-
-					when "oses"
-						key = (element) ->
-							element.device.os
-						assign = (map, element) ->
-							map[element.device.id] = 1
-						transform = (map) ->
-							Object.keys(map).length
-						@pieChart logs, key, assign, transform
-
-					when "pages"
-						key = (element) ->
-							element.location
-						assign = (map, element) ->
-							map[element.device.id] = 1
-						transform = (map) ->
-							Object.keys(map).length
-						@pieChart logs, key, assign, transform
-
-					when "deviceTypes"
-						deviceTypes = {}
-						for l in logs
-							if not deviceTypes[l.device.id]
-								deviceTypes[l.device.id] = {}
-							deviceTypes[l.device.id][l.deviceType()] = 1
-						deviceTypesList = for key, value of deviceTypes
-							device: key
-							types: value
-
-						key = (element) ->
-							Object.keys(element.types).sort().join()
-						assign = (map, element) ->
-							map[element.device] = 1
-						transform = (map) ->
-							Object.keys(map).length
-						@pieChart deviceTypesList, key, assign, transform
-
-					when "deviceTypeCombinations"
-						userDevices = {}
-						for l in logs
-							if l.userIdentifier
-								if not userDevices[l.userIdentifier]
-									userDevices[l.userIdentifier] = {}
-								if not userDevices[l.userIdentifier][l.device.id]
-									userDevices[l.userIdentifier][l.device.id] = {}
-								userDevices[l.userIdentifier][l.device.id][l.deviceType()] = 1
-
-						userDevicesList = for key, value of userDevices
-							user: key
-							devices: value
-
-						key = (element) ->
-							combination = for key, value of element.devices
-								Object.keys(value).sort().join()
-							combination.sort().join(";")
-						assign = (map, element) ->
-							if not map.value
-								map.value = 1
-							else
-								map.value++
-						transform = (map) ->
-							map.value
-						@pieChart userDevicesList, key, assign, transform
-
-			when "user"
-				switch @state.display[@state.mode]
-					when "logs"
-						assign = (map, element) ->
-							if not map[element.device.id]
-								map[element.device.id] = 1
-							else
-								map[element.device.id]++
-						@lineChart logs, date, assign, transform, reduce
+	view: ->
+		"#{@state.mode}-#{@state.display[@state.mode]}"
+	update: (labels, values) ->
+		switch @chartType[@view()]
+			when "line"
+				@lineChart labels, values
+			when "pie"
+				@pieChart values
 
 	pieChart: (data, key, assign, transform) ->
 		i = 0
@@ -502,7 +246,6 @@ Views.Timeline = React.createClass
 		values = []
 
 		colors = @colorPairSeries Object.keys(buckets).length, 1
-		log colors
 
 		i = 0
 		for label, value of buckets
@@ -559,95 +302,13 @@ Views.Timeline = React.createClass
 
 		colors
 
-	getBuckets: ->
+	lineChart: (labels, values) ->
 
-		buckets = []
-
-		from = moment(@state.from)
-		to = moment(@state.to)
-
-		if @state.granularity is "auto"
-			if to.diff(from, 'weeks') > 50
-				granularity = 'month'
-			else if to.diff(from, 'days') > 50
-				granularity = 'week'
-			else if to.diff(from, 'hours') > 50
-				granularity = 'day'
-			else
-				granularity = 'hour'
-		else
-			granularity = @state.granularity
-
-		# Create buckets
-
-		current = from.startOf(granularity)
-		to = to.endOf(granularity)
-		while current < to
-			buckets.push moment(current)
-			current.add(1, granularity)
-
-		formats =
-			month: "MMMM"
-			week: "w"
-			day: "dd D"
-			hour: "H:00"
-		labels = (point.format(formats[granularity]) for point in buckets)
-		buckets.push moment(current)
-
-		[labels, buckets]
-	lineChart: (data, date, assign, transform, reduce) ->
-		if not data
-			return
-
-		if not @timeline
-			return
-
-		[labels, buckets] = @getBuckets()
-
-		i = 0
-		# Discard all points earlier than buckets[0]
-		while i < data.length
-			current = moment(date(data[i]))
-			if current >= buckets[0]
-				break
-			i++
-
-		values = []
-		j = 1
-		# Add al points to their respective buckets
-		while i < data.length and j < buckets.length
-			current = moment(date(data[i]))
-			while current > buckets[j] and j < buckets.length
-				j++
-
-			if j >= buckets.length
-				break
-
-			if not values[j-1]
-				values[j-1] = {}
-			assign(values[j-1], data[i])
-
-			i++
-
-		datasetsMap = {}
-		# Reduce
-		for map, i in values
-			if map
-				map = transform(map)
-				for key, value of map
-					if not datasetsMap[key]
-						datasetsMap[key] = []
-					datasetsMap[key][i] = reduce(value)
-
-		if not Object.keys(datasetsMap).length
-			datasetsMap["No Data"] = []
-
-
-		colors = @colorPairSeries Object.keys(datasetsMap).length, 0.5
+		colors = @colorPairSeries Object.keys(values).length, 0.5
 
 		j = 0
 		datasets = []
-		for key, data of datasetsMap
+		for key, data of values
 			i = 0
 			while i < labels.length
 				if not data[i]
@@ -670,6 +331,7 @@ Views.Timeline = React.createClass
 		if @currentChart
 			@currentChart.destroy()
 		ctx = @timeline.getContext("2d")
+
 		@chart = new Chart(ctx)
 		@currentChart = @chart.Line
 			labels: labels
@@ -681,6 +343,7 @@ Views.Timeline = React.createClass
 	getStyle: ->
 		display: (if @state.mode is "user" and not @state.user then "none" else "block")
 	render: ->
+		@load()
 		<div>
 			<div className="col-xs-12">
 				<h2>Timeline</h2>
@@ -717,98 +380,6 @@ Views.Timeline = React.createClass
 							}
 						</Templates.Table>
 				}
-			</div>
-		</div>
-
-Views.OldTimeline = React.createClass
-	mixins: [ReactMeteorData, ReactUtils]
-	getInitialState: ->
-		from: moment().subtract(30, 'days').toDate()
-		to: new Date()
-	getMeteorData: ->
-		find =
-			appId: @props.appId
-
-		if @state.from or @state.to
-			find.loggedAt = {}
-		if @state.from
-			find.loggedAt.$gte = @state.from
-		if @state.to
-			find.loggedAt.$lte = @state.to
-
-		logs = Logs.find find,
-				sort:
-					loggedAt: -1
-			.fetch()
-
-		@start logs
-
-		logs: logs
-	start: (logs) ->
-		if not @chart
-			return
-
-		if not logs
-			logs = @data.logs
-
-		data =
-			for l in logs
-				date: l.loggedAt
-				value: l.connectedDevices.length
-
-
-		if data.length
-			MG.data_graphic
-				width: @wrapper.width()
-				height: @wrapper.height()
-				data: data
-				#missing_is_hidden: true
-				target: "#timeline"
-				xax_start_at_min: true
-				chart_type: "point"
-				transition_on_update: true
-		else
-			MG.data_graphic
-				width: @wrapper.width()
-				height: @wrapper.height()
-				data: data
-				#missing_is_hidden: true
-				target: "#timeline"
-				xax_start_at_min: true
-				chart_type: "missing-data"
-				transition_on_update: true
-
-
-		###
-		data = ['Devices']
-		for log in @data.logs
-			data.push log.connectedDevices.length + 1
-		@chart.load
-			columns: [
-				data
-			]
-		###
-	componentDidMount: ->
-		@chart = $('#timeline')
-		@wrapper = $('#timeline-wrapper')
-
-		$(window).resize @start
-
-		###
-		@chart = c3.generate
-			bindto: '#timeline'
-			data:
-				columns: [
-					['Devices']
-				]
-		###
-		@start()
-	render: ->
-		<div className="col-xs-12">
-			<h2>Timeline</h2>
-			<Templates.DateRangeInput id="range" label="Range" from={@state.from} to={@state.to} onChange={@updateRange('from', 'to')}/>
-			<div id="timeline-wrapper">
-				<div id="timeline"></div>
 			</div>
 		</div>
 
