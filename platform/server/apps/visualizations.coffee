@@ -71,6 +71,15 @@ computeValue = (logs, view) ->
 						byDeviceType[deviceType]++
 				byDeviceType
 
+		when "global-usersByLocation"
+			assign = (map, element) ->
+				if element.location
+					if not map[element.location]
+						map[element.location] = {}
+					map[element.location][element.userIdentifier] = 1
+			reduce = (value) ->
+				Object.keys(value).length
+
 		when "global-timeOnline"
 			assign = (map, element) ->
 				if not map["Time online"]

@@ -5,6 +5,12 @@ Schemas.DeviceState = new SimpleSchema
 	id:
 		type: String
 		optional: true
+	sessionId:
+		type: String
+		optional: true
+	noStorage:
+		type: Boolean
+		optional: true
 	width:
 		type: Number
 		decimal: true

@@ -132,6 +132,7 @@ Views.Timeline = React.createClass
 	chartType:
 		'global-users': 'line'
 		'global-usersByDeviceType': 'line'
+		'global-usersByLocation': 'line'
 		'global-timeOnline': 'line'
 		'global-timeOnlineByDeviceType': 'line'
 		'global-averageTimeOnline': 'line'
@@ -152,10 +153,11 @@ Views.Timeline = React.createClass
 		global:
 			users: "Users and devices"
 			usersByDeviceType: "Users by device type"
+			usersByLocation: "Users by location"
 			timeOnline: "Time online"
 			timeOnlineByDeviceType: "Time online by device type"
 			averageTimeOnline: "Average time online"
-			devicesPerUser: "Devices per user"
+			devicesPerUser: "Users by number of devices"
 			logs: "Number of logs"
 			views: "Page views"
 			uniquePages: "Unique page views"
@@ -436,12 +438,18 @@ Views.Logs = React.createClass
 			<h2>Logs</h2>
 			{
 				if @props.logs?.length
-					<Templates.Table headers={["Logged at", "Device ID", "Device", "User ID", "Location", "Type", "Comment"]}>
+					<Templates.Table headers={["Logged at", "Device, Session", "Device", "User ID", "Location", "Type", "Comment"]}>
 						{
 							for l, i in @props.logs
 								<tr key={i}>
 									<td>{moment(l.loggedAt).format('YYYY-MM-DD HH:mm:ss:SSS')}</td>
-									<td>{l.device.id}</td>
+									<td>
+										{l.device.id}, {l.device.sessionId}
+										{
+											if l.device.noStorage
+												<span>No storage</span>
+										}
+									</td>
 									<td>{l.device.os}, {l.device.browser}, {l.device.browserVersion}, {l.deviceType()} ({l.device.width}x{l.device.height}, {l.device.pixelRatio}) </td>
 									<td>{l.userIdentifier}</td>
 									<td>{l.location}</td>
