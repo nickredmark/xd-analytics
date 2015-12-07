@@ -60,6 +60,7 @@ Schemas.Log = new SimpleSchema
 		denyUpdate: true
 	date:
 		type: Date
+		optional: true
 	location:
 		type: String
 		optional: true
