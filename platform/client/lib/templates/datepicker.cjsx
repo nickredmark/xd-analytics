@@ -26,11 +26,11 @@ Templates.DateRangePicker = React.createClass
 					moment().format(@props.format)
 				]
 				"Last 7 Days": [
-					moment().subtract(7, 'days').format(@props.format)
+					moment().subtract(6, 'days').format(@props.format)
 					moment().format(@props.format)
 				]
-				"Last 30 Days": [
-					moment().subtract(30, 'days').format(@props.format)
+				"Last month": [
+					moment().subtract(1, 'month').add(1, 'day').format(@props.format)
 					moment().format(@props.format)
 				]
 		, (from, to) ->

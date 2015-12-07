@@ -15,5 +15,8 @@ Schemas.Cache = new SimpleSchema
 	value:
 		type: Object
 		blackbox: true
+	options:
+		type: Object
+		blackbox: true
 
 Cache.attachSchema Schemas.Cache

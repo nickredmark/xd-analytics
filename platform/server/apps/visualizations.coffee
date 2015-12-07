@@ -1,41 +1,93 @@
-getAnalyticsValue = (appId, view, from, to) ->
-		caching = true
-		if caching
-			cache = Cache.findOne
+@preprocessLogs = (appId) ->
+	threshold = 1000 * 60 * 5 # 5 minutes
+	i = 0
+	Logs.find
+		appId: appId
+		date:
+			$exists: false
+	.forEach (l) ->
+		if Math.abs(l.createdAt - l.loggedAt) > threshold
+			date = l.createdAt
+		else
+			date = l.loggedAt
+		Logs.update l._id,
+			$set:
+				date: date
+		if i % 1000 is 0
+			log i
+		i++
+
+reducible =
+	"global-timeOnline": 1
+	"global-timeOnlineByDeviceType": 1
+	"global-logs": 1
+	"global-views": 1
+	"global-logins": 1
+
+getAnalyticsValue = (appId, view, from, to, options) ->
+	cache = Cache.findOne
+		appId: appId
+		view: view
+		from: from
+		to: to
+		options: options
+
+	if cache
+		log "Found in cache"
+		value = {}
+		for cachedKey, v of cache.value
+			key = cachedKey.replace /\[dot\]/g, "."
+			value[key] = v
+
+		value
+	else
+
+		[labels, buckets] = getBuckets from, to
+
+		preprocessLogs appId
+
+		logs = Logs.find
+				appId: appId
+				date:
+					$gte: from
+					$lt: to
+			,
+				sort:
+					date: 1
+
+		if reducible[view] && logs.count() > 100 && labels.length > 1
+				value = {}
+				for label, i in labels
+
+					if buckets[i] > moment()
+						break
+
+					map = getAnalyticsValue appId, view, buckets[i].toDate(), moment(buckets[i+1]).subtract(1, "ms").toDate(), options
+					for key, v of map
+						if not value[key]
+							value[key] = 0
+						value[key] += parseFloat(v)
+
+		else
+			value = computeValue logs, view, options
+
+		if to < moment()
+			cachedValue = {}
+			for key, v of value
+				cachedKey = key.replace /\./g, "[dot]"
+				cachedValue[cachedKey] = v
+
+			Cache.insert
 				appId: appId
 				view: view
 				from: from
 				to: to
+				value: cachedValue
+				options: options
 
-		if cache
-			cache.value
-		else
+		value
 
-			logs = Logs.find
-					appId: appId
-					loggedAt:
-						$gte: from
-						$lt: to
-				,
-					sort:
-						loggedAt: 1
-				.fetch()
-
-
-			value = computeValue logs, view
-
-			if caching
-				if to < moment()
-					Cache.insert
-						appId: appId
-						view: view
-						from: from
-						to: to
-						value: value
-
-			value
-
-computeValue = (logs, view) ->
+computeValue = (logs, view, options) ->
 
 	transform = (map) ->
 		map
@@ -56,22 +108,31 @@ computeValue = (logs, view) ->
 			reduce = (value) ->
 				Object.keys(value).length
 
-		when "global-usersByDeviceType"
-			assign = (map, element) ->
-				if element.userIdentifier
-					if not map[element.userIdentifier]
-						map[element.userIdentifier] = {}
-					map[element.userIdentifier][element.deviceType()] = 1
-			transform = (map) ->
-				byDeviceType = {}
-				for user, types of map
-					for deviceType, one of types
-						if not byDeviceType[deviceType]
-							byDeviceType[deviceType] = 0
-						byDeviceType[deviceType]++
-				byDeviceType
-
 		when "global-usersByLocation"
+			assign = (map, element) ->
+				if element.location
+					for pattern in options.patterns
+						match = element.location.match pattern
+						if match
+							if not map[pattern]
+								map[pattern] = {}
+							map[pattern][element.userIdentifier] = 1
+			reduce = (value) ->
+				Object.keys(value).length
+
+		when "global-usersByLocationSubstring"
+			assign = (map, element) ->
+				if element.location
+					words = element.location.match(/\w+/g)
+					if words
+						for word in words
+							if not map[word]
+								map[word] = {}
+							map[word][element.userIdentifier] = 1
+			reduce = (value) ->
+				Object.keys(value).length
+
+		when "global-usersByFullLocation"
 			assign = (map, element) ->
 				if element.location
 					if not map[element.location]
@@ -86,11 +147,11 @@ computeValue = (logs, view) ->
 					map["Time online"] = {}
 				if not map["Time online"][element.device.id]
 					map["Time online"][element.device.id] = [
-						start: moment(element.loggedAt)
-						end: moment(element.loggedAt)
+						start: moment(element.date)
+						end: moment(element.date)
 					]
 				else
-					current = moment(element.loggedAt)
+					current = moment(element.date)
 					history = map["Time online"][element.device.id]
 					timeout = moment(history[history.length-1].end).add(5, 'minutes')
 					if current < timeout
@@ -108,11 +169,11 @@ computeValue = (logs, view) ->
 					map[element.device.id] =
 						type: {}
 						history: [
-							start: moment(element.loggedAt)
-							end: moment(element.loggedAt)
+							start: moment(element.date)
+							end: moment(element.date)
 						]
 				else
-					current = moment(element.loggedAt)
+					current = moment(element.date)
 					history = map[element.device.id].history
 					timeout = moment(history[history.length-1].end).add(5, 'minutes')
 					if current < timeout
@@ -135,11 +196,11 @@ computeValue = (logs, view) ->
 					map["Time online"] = {}
 				if not map["Time online"][element.device.id]
 					map["Time online"][element.device.id] = [
-						start: moment(element.loggedAt)
-						end: moment(element.loggedAt)
+						start: moment(element.date)
+						end: moment(element.date)
 					]
 				else
-					current = moment(element.loggedAt)
+					current = moment(element.date)
 					history = map["Time online"][element.device.id]
 					timeout = moment(history[history.length-1].end).add(5, 'minutes')
 					if current < timeout
@@ -186,10 +247,11 @@ computeValue = (logs, view) ->
 
 		when "global-views"
 			assign = (map, element) ->
-				if not map["Views"]
-					map["Views"] = 1
-				else
-					map["Views"]++
+				if element.type in ["connected", "location"]
+					if not map["Views"]
+						map["Views"] = 1
+					else
+						map["Views"]++
 
 		when "global-uniquePages"
 			assign = (map, element) ->
@@ -238,18 +300,9 @@ computeValue = (logs, view) ->
 			reduce = (value) ->
 				Object.keys(value).length
 
-		when "global-pages"
-			assign = (map, element) ->
-				key = element.location
-				if not map[key]
-					map[key] = {}
-				map[key][element.device.id] = 1
-			reduce = (value) ->
-				Object.keys(value).length
-
 		when "global-deviceTypes"
 			deviceTypes = {}
-			for l in logs
+			logs.forEach (l) ->
 				if not deviceTypes[l.device.id]
 					deviceTypes[l.device.id] = {}
 				deviceTypes[l.device.id][l.deviceType()] = 1
@@ -259,8 +312,11 @@ computeValue = (logs, view) ->
 			logs = deviceTypesList
 
 			assign = (map, element) ->
-				log element
-				key = Object.keys(element.types).sort().join()
+				#key = Object.keys(element.types).sort().join()
+				if Object.keys(element.types).length > 1
+					key = "variable"
+				else
+					key = Object.keys(element.types)[0]
 				if not map[key]
 					map[key] = {}
 				map[key][element.device] = 1
@@ -269,7 +325,7 @@ computeValue = (logs, view) ->
 
 		when "global-deviceTypeCombinations"
 			userDevices = {}
-			for l in logs
+			logs.forEach (l) ->
 				if l.userIdentifier
 					if not userDevices[l.userIdentifier]
 						userDevices[l.userIdentifier] = {}
@@ -284,13 +340,18 @@ computeValue = (logs, view) ->
 			logs = userDevicesList
 
 			assign = (map, element) ->
-				combination = for key, value of element.devices
-					Object.keys(value).sort().join()
-				key = combination.sort().join(";")
-				if not map[key]
-					map[key] = 1
-				else
-					map[key]++
+				if Object.keys(element.devices).length > 1
+					combination = for key, value of element.devices
+						#Object.keys(value).sort().join()
+						if Object.keys(value).length > 1
+							"variable"
+						else
+							Object.keys(value)[0]
+					key = combination.sort().join(";")
+					if not map[key]
+						map[key] = 1
+					else
+						map[key]++
 
 		when "user-logs"
 			assign = (map, element) ->
@@ -325,26 +386,35 @@ getBuckets = (from, to, granularity) ->
 
 	# Create buckets
 
-	current = from.startOf(granularity)
-	to = to.endOf(granularity)
-	while current < to
-		buckets.push moment(current)
-		current.add(1, granularity)
+	if granularity is "global"
+		labels = ["#{from.format(Constants.dateFormat)} - #{to.format(Constants.dateFormat)}"]
+		buckets = [from, to]
+	else
+		current = from.startOf(granularity)
+		to = to.endOf(granularity)
+		while current < to
+			buckets.push moment(current)
+			current.add(1, granularity)
 
-	formats =
-		month: "MMMM"
-		week: "w"
-		day: "dd D"
-		hour: "H:00"
-	labels = (point.format(formats[granularity]) for point in buckets)
-	buckets.push moment(current)
+		formats =
+			month: "MMMM"
+			week: "w"
+			day: "dd D"
+			hour: "H:00"
+		labels = (point.format(formats[granularity]) for point in buckets)
+		buckets.push moment(current)
 
 	[labels, buckets]
 
 process = (data, assign, transform, reduce) ->
 	map = {}
-	for d in data
-		assign map, d
+
+	if data.forEach
+		data.forEach (d) ->
+			assign map, d
+	else
+		for d in data
+			assign map, d
 
 	map = transform map
 
@@ -355,12 +425,15 @@ process = (data, assign, transform, reduce) ->
 
 Meteor.methods
 
-	getAnalyticsValues: (appId, view, from, to, granularity) ->
+	getAnalyticsValues: (appId, view, from, to, options, granularity) ->
 		[labels, buckets] = getBuckets from, to, granularity
 
 		values = {}
 		for label, i in labels
-			map = getAnalyticsValue appId, view, buckets[i].toDate(), buckets[i+1].toDate()
+			if buckets[i] > moment()
+				break
+
+			map = getAnalyticsValue appId, view, buckets[i].toDate(), moment(buckets[i+1]).subtract(1, "ms").toDate(), options
 			for key, value of map
 				if not values[key]
 					values[key] = []
@@ -371,4 +444,6 @@ Meteor.methods
 
 		[labels, values]
 
-	getAnalyticsValue: getAnalyticsValue
+	clearCache: (appId) ->
+		cache = Cache.remove
+			appId: appId

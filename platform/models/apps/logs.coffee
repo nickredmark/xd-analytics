@@ -1,4 +1,5 @@
 @Logs = new Mongo.Collection "logs"
+
 @Devices = new Mongo.Collection "devices"
 
 Schemas.DeviceState = new SimpleSchema
@@ -54,12 +55,14 @@ Schemas.Log = new SimpleSchema
 				$setOnInsert: new Date
 			else
 				@unset()
-	location:
-		type: String
-		optional: true
 	loggedAt:
 		type: Date
 		denyUpdate: true
+	date:
+		type: Date
+	location:
+		type: String
+		optional: true
 	type:
 		type: String
 	comment:
@@ -89,7 +92,6 @@ Logs.helpers
 			"md"
 		else
 			"sm"
-
 
 Schemas.Device = new SimpleSchema
 	id:

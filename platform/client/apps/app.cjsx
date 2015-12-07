@@ -124,35 +124,14 @@ Views.Overview = React.createClass
 
 
 Views.Timeline = React.createClass
-	mixins: [ReactMeteorData, ReactUtils]
+	mixins: [ReactUtils]
 	modes:
 		global: "Global"
 		user: "User"
 		device: "Device"
-	chartType:
-		'global-users': 'line'
-		'global-usersByDeviceType': 'line'
-		'global-usersByLocation': 'line'
-		'global-timeOnline': 'line'
-		'global-timeOnlineByDeviceType': 'line'
-		'global-averageTimeOnline': 'line'
-		'global-devicesPerUser': 'line'
-		'global-logs': 'line'
-		'global-views': 'line'
-		'global-uniquePages': 'line'
-		'global-logins': 'line'
-		'global-browsers': 'pie'
-		'global-browserVersions': 'pie'
-		'global-oses': 'pie'
-		'global-pages': 'pie'
-		'global-deviceTypes': 'pie'
-		'global-deviceTypeCombinations': 'pie'
-		'user-logs': 'line'
-		'device-logs': 'line'
 	displays:
 		global:
 			users: "Users and devices"
-			usersByDeviceType: "Users by device type"
 			usersByLocation: "Users by location"
 			timeOnline: "Time online"
 			timeOnlineByDeviceType: "Time online by device type"
@@ -165,7 +144,6 @@ Views.Timeline = React.createClass
 			browsers: "Browsers"
 			browserVersions: "Browser versions"
 			oses: "Operating systems"
-			pages: "Pages"
 			deviceTypes: "Device types"
 			deviceTypeCombinations: "Device type combinations"
 		user:
@@ -177,8 +155,9 @@ Views.Timeline = React.createClass
 		day: "Day"
 		week: "Week"
 		month: "Month"
+		global: "Global"
 	getInitialState: ->
-		from: moment().subtract(7, 'days').toDate()
+		from: moment().subtract(6, 'days').toDate()
 		to: new Date()
 		mode: 'global'
 		display:
@@ -186,55 +165,97 @@ Views.Timeline = React.createClass
 			user: 'logs'
 			device: 'logs'
 		granularity: 'auto'
+		visibleView: null
+		visibleFrom: null
+		visibleTo: null
+		visibleGranularity: null
 		user: null
 		device: null
+		locations: null
+		locationSubstrings: null
+		options:
+			"global-usersByLocation":
+				patterns: [
+					""
+				]
 	componentDidMount: ->
 		@timeline = document.getElementById("timeline")
 		@load()
+	componentDidUpdate: (prevProps, prevState) ->
+		if @view() != @state.visibleView or @state.from != @state.visibleFrom or @state.to != @state.visibleTo or @state.granularity != @state.visibleGranularity
+			@load()
+	options: ->
+		@state.options[@view()] or {}
+	updateVisibleState: ->
+		@setState
+			visibleView: @view()
+			visibleFrom: @state.from
+			visibleTo: @state.to
+			visibleGranularity: @state.granularity
 	load: ->
 		self = @
+		view = @view()
 		if @timeline
-			switch @chartType[@view()]
-				when "line"
-					Meteor.call 'getAnalyticsValues', @props.appId, @view(), @state.from, @state.to, @state.granularity, (e, r) ->
-						checkError e
+			Meteor.call 'getAnalyticsValues', @props.appId, view, @state.from, @state.to, @options(), @state.granularity, (e, r) ->
+				checkError e
+				[labels, values] = r
+				if labels.length == 1
+					log values
+
+					self.barChart labels, values
+					###
+					map = {}
+					for key, vals of values
+						map[key] = vals[0]
+					self.pieChart map
+					###
+				else
+					self.lineChart labels, values
+				self.updateVisibleState()
+
+			if @view() is "global-usersByLocation"
+				Meteor.call 'getAnalyticsValues', @props.appId, "global-usersByLocationSubstring", @state.from, @state.to, {}, "global", (e, r) ->
+					checkError e
+					[labels, values] = r
+					substrings = []
+					for string, count of values
+						substrings.push
+							string: string
+							count: count[0]
+
+					substrings.sort (a, b) ->
+						a.count < b.count
+
+					self.setState
+						locationSubstrings: substrings
+
+				Meteor.call 'getAnalyticsValues', @props.appId, "global-usersByFullLocation", @state.from, @state.to, {}, "global", (e, r) ->
+					checkError e
+					try
 						[labels, values] = r
-						self.lineChart labels, values
-				when "pie"
-					Meteor.call 'getAnalyticsValue', @props.appId, @view(), @state.from, @state.to, @state.granularity, (e, r) ->
-						checkError e
-						self.pieChart r
-	getMeteorData: ->
+						locations = []
+						for location, count of values
+							locations.push
+								location: location
+								count: count[0]
 
-		###
-		if allLogs
-			usersMap = {}
-			for l in allLogs
-				if l.userIdentifier
-					if not usersMap[l.userIdentifier]
-						usersMap[l.userIdentifier] =
-							devices: {}
-					usersMap[l.userIdentifier].devices[l.device.id] = 1
+						locations.sort (a, b) ->
+							a.count < b.count
 
-			users = for id, data of usersMap
-				id: id
-				data: data
-			users.sort (u1, u2) ->
-				Object.keys(u1.data.devices).length <= Object.keys(u2.data.devices).length
+						self.setState
+							locations: locations
+					catch e
+						log e
 
-		allLogs: allLogs
-		logs: logs
-		users: users
-		###
-
-		{}
-
+	refresh: ->
+		@load()
 	timeline: null
 	chart: null
 	currentChart: null
 
-	view: ->
-		"#{@state.mode}-#{@state.display[@state.mode]}"
+	view: (state) ->
+		state = state or @state
+		"#{state.mode}-#{state.display[state.mode]}"
 	pieChart: (buckets) ->
 
 		colors = @colorPairSeries Object.keys(buckets).length, 1
@@ -293,6 +314,39 @@ Views.Timeline = React.createClass
 
 		colors
 
+	barChart: (labels, values) ->
+		colors = @colorPairSeries Object.keys(values).length, 0.5
+
+		j = 0
+		datasets = []
+		for key, data of values
+			i = 0
+			while i < labels.length
+				if not data[i]
+					data[i] = 0
+				i++
+			[color, lighter] = colors[j]
+			datasets.push
+				label: key
+				data: data
+				fillColor: lighter
+				strokeColor: color
+				highlightFill: lighter
+				highlightStroke: color
+
+			j++
+
+		if @currentChart
+			@currentChart.destroy()
+		ctx = @timeline.getContext("2d")
+
+		@chart = new Chart(ctx)
+		@currentChart = @chart.Bar
+			labels: labels
+			datasets: datasets
+		,
+			multiTooltipTemplate: "<%= datasetLabel %> - <%= value %>"
+
 	lineChart: (labels, values) ->
 
 		colors = @colorPairSeries Object.keys(values).length, 0.5
@@ -333,8 +387,14 @@ Views.Timeline = React.createClass
 
 	getStyle: ->
 		display: (if @state.mode is "user" and not @state.user then "none" else "block")
+	clearCache: ->
+		Meteor.call 'clearCache', @props.appId, handleResult "Cache cleared"
+	addPattern: ->
+		options = @state.options
+		options["global-usersByLocation"].patterns.push ""
+		@setState
+			options: options
 	render: ->
-		@load()
 		<div>
 			<div className="col-xs-12">
 				<h2>Timeline</h2>
@@ -346,6 +406,15 @@ Views.Timeline = React.createClass
 			<div className="col-xs-12 col-sm-6">
 				<Templates.Select id="mode" label="Mode" options={@modes} value={@state.mode} onChange={@updateValue('mode')}/>
 				<Templates.Select id="display" label="Data" options={@displays[@state.mode]} value={@state.display[@state.mode]} onChange={@updateDictValue('display', @state.mode)}/>
+			</div>
+			<div className="col-xs-12">
+				<button className="btn btn-default" onClick={@refresh}>
+					Refresh
+				</button>
+				{" "}
+				<button className="btn btn-default" onClick={@clearCache}>
+					Clear cache
+				</button>
 			</div>
 			<div className="col-xs-12">
 				<div id="timeline-wrapper">
@@ -372,6 +441,52 @@ Views.Timeline = React.createClass
 						</Templates.Table>
 				}
 			</div>
+			<div className="col-xs-12 col-sm-4">
+				{
+					if @view() is "global-usersByLocation"
+						<div>
+							<h3>Patterns</h3>
+							{
+								for pattern, i in @options().patterns
+									<input key={i} type="text" className="form-control" value={pattern} onChange={@updateDictValue('options', 'global-usersByLocation', 'patterns', i)}/>
+							}
+							<button className="btn btn-default" onClick={@addPattern}><i className="fa fa-plus"></i></button>
+						</div>
+				}
+			</div>
+			{
+				if @view() is "global-usersByLocation"
+					<div>
+						<div className="col-xs-12 col-sm-4">
+							<h3>Most frequent keywords</h3>
+							{
+								if @state.locationSubstrings
+									<ul>
+										{
+											for substring, i in @state.locationSubstrings
+												<li key={i}>{substring.string} {substring.count}</li>
+										}
+									</ul>
+								else
+									<Templates.Loading/>
+							}
+						</div>
+						<div className="col-xs-12 col-sm-4">
+							<h3>Most frequent locations</h3>
+							{
+								if @state.locations
+									<ul>
+										{
+											for location, i in @state.locations
+												<li key={i}>{location.location} {location.count}</li>
+										}
+									</ul>
+								else
+									<Templates.Loading/>
+							}
+						</div>
+					</div>
+			}
 		</div>
 
 Views.Devices = React.createClass

@@ -37,12 +37,16 @@
 		self = @
 		(e) ->
 			Session.set name, e.target.value
-	updateDictValue: (dictName, key) ->
+	updateDictValue: (dictName, keys...) ->
 		self = @
 		(e) ->
 			set = {}
 			set[dictName] = self.state[dictName]
-			set[dictName][key] = e.target.value
+			current = set[dictName]
+			last = keys.splice -1
+			for key in keys
+				current = current[key]
+			current[last] = e.target.value
 			self.setState set
 	updateBoolean: (name) ->
 		self = @
