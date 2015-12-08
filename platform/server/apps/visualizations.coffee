@@ -1,11 +1,12 @@
 @preprocessLogs = (appId) ->
 	threshold = 1000 * 60 * 5 # 5 minutes
 	i = 0
-	Logs.find
+	logs = Logs.find
 		appId: appId
 		date:
 			$exists: false
-	.forEach (l) ->
+	log logs.count()
+	logs.forEach (l) ->
 		if Math.abs(l.createdAt - l.loggedAt) > threshold
 			date = l.createdAt
 		else

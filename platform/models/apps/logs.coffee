@@ -60,7 +60,15 @@ Schemas.Log = new SimpleSchema
 		denyUpdate: true
 	date:
 		type: Date
-		optional: true
+		autoValue: ->
+			if @isInsert
+				now = new Date
+				threshold = 1000 * 60 * 5 # 5 minutes
+				loggedAt = @field("loggedAt").value
+				if Math.abs(now - loggedAt) > threshold
+					now
+				else
+					loggedAt
 	location:
 		type: String
 		optional: true
