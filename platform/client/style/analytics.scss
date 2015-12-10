@@ -54,6 +54,32 @@
 	height: 400px;
 }
 
+.labels {
+	label {
+		margin: 5px;
+		padding: 5px 10px;
+		font-weight: normal;
+		border-radius: 5px;
+		background-color: #F5F5F5;
+
+		a {
+			color: inherit;
+		}
+
+		&.active {
+			background-color: #6767FB;
+			color: white;
+			//font-weight: bold;
+		}
+	}
+}
+
+.activables {
+	.active {
+		font-weight: bold;
+	}
+}
+
 .roles {
 	margin-bottom: 10px;
 	ul {

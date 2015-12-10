@@ -14,6 +14,22 @@ Meteor.publish "apps", ->
 
 Meteor.publish "app", (appId) ->
 	if Roles.userHasRole(@userId, 'admin')
+		Apps.find appId
+	else
+		app = Apps.find
+			_id: appId
+			userId: @userId
+		,
+			fields:
+				name: 1
+				description: 1
+				apiKey: 1
+				device: 1
+				connectedDevices: 1
+				roles: 1
+
+Meteor.publish "oldapp", (appId) ->
+	if Roles.userHasRole(@userId, 'admin')
 		[
 			Apps.find appId
 			Logs.find

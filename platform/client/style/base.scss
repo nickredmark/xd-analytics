@@ -28,3 +28,18 @@ a, label {
 	position: fixed;
 	top: 20px;
 }
+
+ul {
+	padding-left: 10px;
+}
+li {
+	list-style: none;
+}
+
+.btn-naked {
+	&, &:hover, &:focus, &:active {
+		background: none;
+		color: #337AB7;
+		box-shadow: none;
+	}
+}

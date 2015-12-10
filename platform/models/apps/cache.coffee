@@ -13,8 +13,8 @@ Schemas.Cache = new SimpleSchema
 	to:
 		type: Date
 	value:
-		type: Object
-		blackbox: true
+		type: Number
+		decimal: true
 	options:
 		type: Object
 		blackbox: true

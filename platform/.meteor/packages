@@ -92,5 +92,5 @@ universe:i18n
 # More
 emdagon:c3js
 fermuch:metrics-graphics
-meteorhacks:aggregate
+monbro:mongodb-mapreduce-aggregation
 percolate:migrations
