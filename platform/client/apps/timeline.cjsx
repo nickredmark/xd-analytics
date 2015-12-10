@@ -80,8 +80,6 @@ Views.Timeline = React.createClass
 	#componentDidUpdate: (prevProps, prevState) ->
 		#if !@visibleStateUpToDate()
 			#@load()
-	options: ->
-		@state.options[@view()] or {}
 	updateVisibleState: ->
 		@setState
 			visibleView: @view()
@@ -132,7 +130,7 @@ Views.Timeline = React.createClass
 	loadValue: (name) ->
 		self = @
 		if @state.data[name]
-			Meteor.call 'getAnalyticsValues', @props.appId, name, @state.from, @state.to, @options(), @state.granularity, handleResult null, (r) ->
+			Meteor.call 'getAnalyticsValues', @props.appId, name, @state.from, @state.to, {}, @state.granularity, handleResult null, (r) ->
 				[labels, values] = r
 				self.labels = labels
 				self.values[self.data[name]] = values
@@ -302,10 +300,10 @@ Views.Timeline = React.createClass
 	clearCache: ->
 		Meteor.call 'clearCache', @props.appId, handleResult "Cache cleared"
 	addPattern: ->
-		options = @state.options
-		options["global-views"].patterns.push @state.pattern
+		patterns = @state.patterns
+		patterns.push @state.pattern
 		@setState
-			options: options
+			patterns: patterns
 			pattern: ""
 	render: ->
 		<div>
