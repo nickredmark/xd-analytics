@@ -4,7 +4,7 @@ Templates.MainLayout = React.createClass
 		handle = Meteor.subscribe "user"
 
 		ready: handle.ready()
-		user: Meteor.user() # Needed for the template to react to user change
+		user: Meteor.user()
 		isAdmin: Meteor.user()?.isAdmin()
 		loggingIn: Meteor.loggingIn()
 	render: ->
@@ -12,25 +12,28 @@ Templates.MainLayout = React.createClass
 			<Header/>
 			<main>
 				{
-					if @data.ready
-						switch @props.access
-							when "member"
-								if @data.user
-									this.props.content
-								else
-									<LoginRequired/>
-							when "admin"
-								if @data.user
-									if @data.user.isAdmin()
-										this.props.content
-									else
-										<Forbidden/>
-								else
-									<LoginRequired/>
-							else
+					switch @props.access
+						when "member"
+							if @data.user
 								this.props.content
-					else
-						<Templates.Loading/>
+							else if @data.ready
+								<LoginRequired/>
+							else
+								<Templates.Loading/>
+						when "admin"
+							if @data.user
+								if @data.user.isAdmin()
+									this.props.content
+								else if @data.ready
+									<Forbidden/>
+								else
+									<Templates.Loading/>
+							else if @data.ready
+								<LoginRequired/>
+							else
+								<Templates.Loading/>
+						else
+							this.props.content
 				}
 			</main>
 			<Footer/>

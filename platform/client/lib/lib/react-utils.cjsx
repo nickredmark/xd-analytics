@@ -42,6 +42,10 @@
 	wrap: (f, args...) ->
 		->
 			f args...
+	doublewrap: (f) ->
+		(args...) ->
+			->
+				f args...
 	toggleDictBoolean: (dictName, key, callback) ->
 		self = @
 		->
@@ -83,11 +87,11 @@
 			e.preventDefault()
 			if self.state[newElementName]
 				list = self.state[listName]
-				list.push self.state[newElementName]
+				i = list.push self.state[newElementName]
 				set = {}
 				set[listName] = list
 				set[newElementName] = ""
-				self.setState set, callback
+				self.setState set, callback(i-1)
 	removeItem: (listName, i, callback) ->
 		self = @
 		(e) ->
@@ -97,3 +101,9 @@
 			set = {}
 			set[listName] = list
 			self.setState set, callback
+	onEnter: (c) ->
+		self = @
+		(e) ->
+			switch e.keyCode
+				when 13 # Enter
+					c()

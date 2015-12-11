@@ -61,6 +61,7 @@ Views.Timeline = React.createClass
 		activeBrowserVersions: {}
 		activeLocations: {}
 		activeOSes: {}
+		activePatterns: {}
 
 		locations: null
 		browsers: null
@@ -73,7 +74,6 @@ Views.Timeline = React.createClass
 		locationSubstrings: null
 
 		pattern: ""
-		patterns: []
 	componentDidMount: ->
 		@timeline = document.getElementById("timeline")
 		@loadAllValues()
@@ -127,6 +127,33 @@ Views.Timeline = React.createClass
 		Meteor.call 'getAggregatedValues', @props.appId, "browsers-#{@state.browserView}", @state.from, @state.to, handleResult null, (r) ->
 			self.setState
 				browsers: r
+	addPattern: ->
+		activePatterns = @state.activePatterns
+		pattern = @state.pattern
+		activePatterns[pattern] = true
+		@setState
+			activePatterns: activePatterns
+			pattern: ""
+		, ->
+			@loadPattern pattern
+	removePattern: (pattern) ->
+		activePatterns = @state.activePatterns
+		delete(activePatterns[pattern])
+		@setState
+			activePatterns: activePatterns
+		, ->
+			@loadPattern pattern
+	loadPattern: (pattern) ->
+		self = @
+		if @state.activePatterns[pattern]
+			Meteor.call 'getAnalyticsValues', @props.appId, "location-pattern", @state.from, @state.to, {pattern: pattern}, @state.granularity, handleResult null, (r) ->
+				[labels, values] = r
+				self.labels = labels
+				self.values["Location pattern: #{pattern}"] = values
+				self.lineChart()
+		else
+			delete(@values["Location pattern: #{pattern}"])
+			self.lineChart()
 	loadValue: (name) ->
 		self = @
 		if @state.data[name]
@@ -299,12 +326,6 @@ Views.Timeline = React.createClass
 			bezierCurve: false
 	clearCache: ->
 		Meteor.call 'clearCache', @props.appId, handleResult "Cache cleared"
-	addPattern: ->
-		patterns = @state.patterns
-		patterns.push @state.pattern
-		@setState
-			patterns: patterns
-			pattern: ""
 	render: ->
 		<div>
 			<div className="col-xs-12">
@@ -347,18 +368,28 @@ Views.Timeline = React.createClass
 				<h3>Locations</h3>
 				<div className="form-group">
 					<div className="input-group">
-						<input key={i} type="text" className="form-control" value={pattern} onChange={@updateDictValue('patterns', i)}/>
-						<button className="input-group-addon btn btn-main" onClick={@addPattern}><i className="fa fa-plus"></i></button>
+						<input type="text" className="form-control" value={@state.pattern} onChange={@updateValue('pattern')} onKeyDown={@onEnter(@addPattern)}/>
+						<span className="input-group-btn">
+							<button className="btn btn-primary" onClick={@addPattern}>
+								<i className="fa fa-plus"></i>
+							</button>
+						</span>
 					</div>
 				</div>
 				{
-					if @state.patterns
-						<ul>
-							{
-								for pattern, i in @state.patterns
-									<li key={i}>{pattern}</li>
-							}
-						</ul>
+					<ul>
+						{
+							for pattern, active of @state.activePatterns
+								if active
+									<li key={pattern}>
+										{pattern}
+										&nbsp;
+										<button className="btn btn-danger btn-xs" onClick={@wrap(@removePattern, pattern)}>
+											<i className="fa fa-remove"></i>
+										</button>
+									</li>
+						}
+					</ul>
 				}
 				{
 					if @state.locations
