@@ -1,4 +1,4 @@
-@preprocessLogs = (appId) ->
+@preprocessLogs = (appId, from, to) ->
 	threshold = 1000 * 60 * 5 # 5 minutes
 	logs = Logs.find
 		appId: appId
@@ -20,6 +20,41 @@
 				log i
 			i++
 
+	logs = Logs.find
+		appId: appId
+		date:
+			$gte: from
+			$lt: to
+		"device.type":
+			$exists: false
+		type:
+			$in: ["connected", "location"]
+	count = logs.count()
+	if count
+		log count
+		i = 0
+		logs.forEach (l) ->
+			diam = Math.sqrt l.device.width*l.device.width + l.device.height*l.device.height
+			if l.pixelRatio
+				realDiam = diam / l.pixelRatio
+			else
+				realDiam = diam
+			if realDiam > 1800
+				type = "xl"
+			else if realDiam > 1150
+				type = "lg"
+			else if realDiam > 500
+				type = "md"
+			else
+				type = "sm"
+			Logs.update l._id,
+				$set:
+					"device.diam": realDiam
+					"device.type": type
+			if i % 1000 is 0
+				log i
+			i++
+
 ###
 reducible =
 	"global-timeOnline": 1
@@ -33,249 +68,373 @@ getAggregatedValues = (appId, view, from, to, options) ->
 
 	log "get aggregated values #{appId} #{view} #{from} - #{to}"
 
-	aggregate = []
-	match =
-		appId: appId
-		date:
-			$gte: from
-			$lt: to
-	aggregate.push
-		$match: match
+	cache = Cache.findOne
+			appId: appId
+			view: view
+			from: from
+			to: to
+			options: options
+		,
+			fields:
+				valueObject: 1
 
-	switch view
-		when "browsers-devices"
-			aggregate.push
-				$group:
-					_id:
-						device: "$device.id"
-						browser: "$device.browser"
-						version: "$device.browserVersion"
+	if cache
+		log "Found in cache"
+		aggregated = cache.valueObject
+	else
 
-			aggregate.push
-				$group:
-					_id:
-						browser: "$_id.browser"
-						version: "$_id.version"
-					count:
-						$sum: 1
+		preprocessLogs appId, from, to
 
-			aggregate.push
-				$sort:
-					count: -1
+		aggregate = []
+		match =
+			appId: appId
+			date:
+				$gte: from
+				$lt: to
+		aggregate.push
+			$match: match
 
-			aggregate.push
-				$group:
-					_id: "$_id.browser"
-					count:
-						$sum: "$count"
-					versions:
-						$push:
+		switch view
+			when "browsers-devices"
+				aggregate.push
+					$group:
+						_id:
+							device: "$device.id"
+							browser: "$device.browser"
+							version: "$device.browserVersion"
+
+				aggregate.push
+					$group:
+						_id:
+							browser: "$_id.browser"
 							version: "$_id.version"
-							count: "$count"
+						count:
+							$sum: 1
 
-			aggregate.push
-				$sort:
-					count: -1
+				aggregate.push
+					$sort:
+						count: -1
 
-			aggregate.push
-				$limit: options?.limit or 20
+				aggregate.push
+					$group:
+						_id: "$_id.browser"
+						count:
+							$sum: "$count"
+						versions:
+							$push:
+								version: "$_id.version"
+								count: "$count"
 
-			aggregated = Logs.aggregate aggregate
+				aggregate.push
+					$sort:
+						count: -1
 
-		when "browsers-views"
-			match.type =
-				$in: ["connected", "location"]
+				aggregate.push
+					$limit: options?.limit or 20
 
-			aggregate.push
-				$group:
-					_id:
-						browser: "$device.browser"
-						version: "$device.browserVersion"
-					count:
-						$sum: 1
+				aggregated = Logs.aggregate aggregate
 
-			aggregate.push
-				$sort:
-					count: -1
+			when "device-types"
+				match["device.type"] =
+					$exists: true
+					$ne: null
+				match.type =
+					$in: ["connected", "location"]
 
-			aggregate.push
-				$group:
-					_id: "$_id.browser"
-					count:
-						$sum: "$count"
-					versions:
-						$push:
+				aggregate.push
+					$group:
+						_id: "$device.type"
+						count:
+							$sum: 1
+
+				aggregate.push
+					$sort:
+						count: -1
+
+				aggregated = Logs.aggregate aggregate
+
+			when "browsers-views"
+				match.type =
+					$in: ["connected", "location"]
+
+				aggregate.push
+					$group:
+						_id:
+							browser: "$device.browser"
+							version: "$device.browserVersion"
+						count:
+							$sum: 1
+
+				aggregate.push
+					$sort:
+						count: -1
+
+				aggregate.push
+					$group:
+						_id: "$_id.browser"
+						count:
+							$sum: "$count"
+						versions:
+							$push:
+								version: "$_id.version"
+								count: "$count"
+
+				aggregate.push
+					$sort:
+						count: -1
+
+				aggregate.push
+					$limit: options?.limit or 20
+
+				aggregated = Logs.aggregate aggregate
+			when "browsers-versions"
+				aggregate.push
+					$group:
+						_id:
+							device: "$device.id"
+							browser: "$device.browser"
+							version: "$device.browserVersion"
+
+				aggregate.push
+					$group:
+						_id:
+							browser: "$_id.browser"
 							version: "$_id.version"
-							count: "$count"
+						count:
+							$sum: 1
 
-			aggregate.push
-				$sort:
-					count: -1
+				aggregate.push
+					$sort:
+						count: -1
 
-			aggregate.push
-				$limit: options?.limit or 20
+				aggregate.push
+					$group:
+						_id: "$_id.browser"
+						count:
+							$sum: 1
+						versions:
+							$push:
+								version: "$_id.version"
+								count: "$count"
 
-			aggregated = Logs.aggregate aggregate
-		when "browsers-versions"
-			aggregate.push
-				$group:
-					_id:
-						device: "$device.id"
-						browser: "$device.browser"
-						version: "$device.browserVersion"
+				aggregate.push
+					$sort:
+						count: -1
 
-			aggregate.push
-				$group:
-					_id:
-						browser: "$_id.browser"
-						version: "$_id.version"
-					count:
-						$sum: 1
+				aggregate.push
+					$limit: options?.limit or 20
 
-			aggregate.push
-				$sort:
-					count: -1
+				aggregated = Logs.aggregate aggregate
+			when "oses"
 
-			aggregate.push
-				$group:
-					_id: "$_id.browser"
-					count:
-						$sum: 1
-					versions:
-						$push:
-							version: "$_id.version"
-							count: "$count"
+				aggregate.push
+					$group:
+						_id:
+							device: "$device.id"
+							os: "$device.os"
 
-			aggregate.push
-				$sort:
-					count: -1
+				aggregate.push
+					$group:
+						_id: "$_id.os"
+						count:
+							$sum: 1
 
-			aggregate.push
-				$limit: options?.limit or 20
+				aggregate.push
+					$sort:
+						count: -1
 
-			aggregated = Logs.aggregate aggregate
-		when "oses"
+				aggregate.push
+					$limit: options?.limit or 20
 
-			aggregate.push
-				$group:
-					_id:
-						device: "$device.id"
-						os: "$device.os"
+				aggregated = Logs.aggregate aggregate
 
-			aggregate.push
-				$group:
-					_id: "$_id.os"
-					count:
-						$sum: 1
+			when "deviceCombinations-coincident"
+				match.userIdentifier =
+					$exists: true
+					$ne: null
 
-			aggregate.push
-				$sort:
-					count: -1
+				aggregate.push
+					$group:
+						_id:
+							year:
+								$year: "$date"
+							month:
+								$month: "$date"
+							day:
+								$dayOfMonth: "$date"
+							hour:
+								$hour: "$date"
+							#minute:
+							#	$minute: "$date"
+							user: "$userIdentifier"
+							device: "$device.id"
 
-			aggregate.push
-				$limit: options?.limit or 20
+				aggregate.push
+					$group:
+						_id:
+							year: "$_id.year"
+							month: "$_id.month"
+							day: "$_id.day"
+							hour: "$_id.hour"
+							#minute: "$_id.minute"
+							user: "$_id.user"
+						count:
+							$sum: 1
 
-			aggregated = Logs.aggregate aggregate
-		when "locations"
-			match.location =
-				$exists: true
-				$ne: null
-			match.type =
-				$in: ["connected", "location"]
+				aggregate.push
+					$group:
+						_id:
+							user: "$_id.user"
+						count:
+							$max: "$count"
 
-			aggregate.push
-				$group:
-					_id: "$location"
-					count:
-						$sum: 1
+				aggregate.push
+					$group:
+						_id: "$count"
+						count:
+							$sum: 1
 
-			aggregate.push
-				$sort:
-					count: -1
+				aggregate.push
+					$sort:
+						count: -1
 
-			aggregate.push
-				$limit: options?.limit or 20
+				aggregated = Logs.aggregate aggregate
 
-			aggregated = Logs.aggregate aggregate
+			when "deviceCombinations-overall"
 
-		when "users-views"
-			match.userIdentifier =
-				$exists: true
-				$ne: null
-			match.type =
-				$in: ["connected", "location"]
+				aggregate.push
+					$group:
+						_id:
+							device: "$device.id"
+							user: "$userIdentifier"
 
-			aggregate.push
-				$group:
-					_id:
-						user: "$userIdentifier"
-						device: "$device.id"
-					count:
-						$sum: 1
+				aggregate.push
+					$group:
+						_id: "$_id.device"
+						count:
+							$sum: 1
 
-			aggregate.push
-				$sort:
-					count: -1
+				aggregate.push
+					$group:
+						_id: "$count"
+						count:
+							$sum: 1
 
-			aggregate.push
-				$group:
-					_id: "$_id.user"
-					count:
-						$sum: "$count"
-					devices:
-						$push:
-							id: "$_id.device"
-							count: "$count"
+				aggregate.push
+					$sort:
+						count: -1
 
-			aggregate.push
-				$sort:
-					count: -1
+				aggregated = Logs.aggregate aggregate
 
-			aggregate.push
-				$limit: options?.limit or 20
+			when "locations"
+				match.location =
+					$exists: true
+					$ne: null
+				match.type =
+					$in: ["connected", "location"]
 
-			aggregated = Logs.aggregate aggregate
+				aggregate.push
+					$group:
+						_id: "$location"
+						count:
+							$sum: 1
 
-		when "users-devices"
-			match.userIdentifier =
-				$exists: true
-				$ne: null
-			match.type =
-				$in: ["connected", "location"]
+				aggregate.push
+					$sort:
+						count: -1
 
-			aggregate.push
-				$group:
-					_id:
-						user: "$userIdentifier"
-						device: "$device.id"
-					count:
-						$sum: 1
+				aggregate.push
+					$limit: options?.limit or 20
 
-			aggregate.push
-				$sort:
-					count: -1
+				aggregated = Logs.aggregate aggregate
 
-			aggregate.push
-				$group:
-					_id: "$_id.user"
-					count:
-						$sum: 1
-					devices:
-						$push:
-							id: "$_id.device"
-							count: "$count"
+			when "users-views"
+				match.userIdentifier =
+					$exists: true
+					$ne: null
+				match.type =
+					$in: ["connected", "location"]
 
-			aggregate.push
-				$sort:
-					count: -1
+				aggregate.push
+					$group:
+						_id:
+							user: "$userIdentifier"
+							device: "$device.id"
+						count:
+							$sum: 1
 
-			aggregate.push
-				$limit: options?.limit or 20
+				aggregate.push
+					$sort:
+						count: -1
 
-			aggregated = Logs.aggregate aggregate
+				aggregate.push
+					$group:
+						_id: "$_id.user"
+						count:
+							$sum: "$count"
+						devices:
+							$push:
+								id: "$_id.device"
+								count: "$count"
 
-		else
-			throw new Meteor.Error "Unknown view: #{view}"
+				aggregate.push
+					$sort:
+						count: -1
+
+				aggregate.push
+					$limit: options?.limit or 20
+
+				aggregated = Logs.aggregate aggregate
+
+			when "users-devices"
+				match.userIdentifier =
+					$exists: true
+					$ne: null
+				match.type =
+					$in: ["connected", "location"]
+
+				aggregate.push
+					$group:
+						_id:
+							user: "$userIdentifier"
+							device: "$device.id"
+						count:
+							$sum: 1
+
+				aggregate.push
+					$sort:
+						count: -1
+
+				aggregate.push
+					$group:
+						_id: "$_id.user"
+						count:
+							$sum: 1
+						devices:
+							$push:
+								id: "$_id.device"
+								count: "$count"
+
+				aggregate.push
+					$sort:
+						count: -1
+
+				aggregate.push
+					$limit: options?.limit or 20
+
+				aggregated = Logs.aggregate aggregate
+
+			else
+				throw new Meteor.Error "Unknown view: #{view}"
+
+		if to < moment()
+			Cache.insert
+				appId: appId
+				view: view
+				from: from
+				to: to
+				options: options
+				valueObject: aggregated
 
 	log aggregated
 
@@ -296,12 +455,12 @@ getAnalyticsValue = (appId, view, from, to, options) ->
 		cache.value
 	else
 
-
 		aggregate = [
 			"users"
 			"devices"
 			"views"
-			"viewsByFullLocation"
+			"uniqueViews"
+			"sessions"
 			"logs"
 			"logins"
 			"logouts"
@@ -312,15 +471,18 @@ getAnalyticsValue = (appId, view, from, to, options) ->
 			"os"
 			"user"
 			"device"
+			"device-count-overall"
+			"device-count-coincident"
+			"device-type"
 		]
 		if view in aggregate
 			value = computeAggregatedValue appId, view, from, to, options
 		else
+			preprocessLogs appId, from, to
 
 			###
 			[labels, buckets] = getBuckets from, to
 
-			preprocessLogs appId
 
 			logs = Logs.find
 					appId: appId
@@ -422,6 +584,123 @@ computeAggregatedValue = (appId, view, from, to, options) ->
 			else
 				value = 0
 
+		when "device-type"
+			match.type =
+				$in: ["connected", "location"]
+			match["device.type"] = options.deviceType
+			value = Logs.find(match).count()
+
+		when "device-count-overall"
+			match['device.id'] =
+				$exists: true
+				$ne: null
+
+			match.userIdentifier =
+				$exists: true
+				$ne: null
+
+			aggregate.push
+				$group:
+					_id:
+						device: "$device.id"
+						user: "$userIdentifier"
+
+			aggregate.push
+				$group:
+					_id: "$_id.user"
+					count:
+						$sum: 1
+
+			aggregate.push
+				$match:
+					count: options.deviceCount
+
+			aggregate.push
+				$group:
+					_id: "count"
+					count:
+						$sum: 1
+
+			aggregated = Logs.aggregate aggregate
+			if aggregated.length
+				value = aggregated[0].count
+			else
+				value = 0
+
+		when "device-count-coincident"
+			match.userIdentifier =
+				$exists: true
+				$ne: null
+
+			aggregate.push
+				$group:
+					_id:
+						year:
+							$year: "$date"
+						month:
+							$month: "$date"
+						day:
+							$dayOfMonth: "$date"
+						hour:
+							$hour: "$date"
+						#minute:
+						#	$minute: "$date"
+						user: "$userIdentifier"
+						device: "$device.id"
+
+			aggregate.push
+				$group:
+					_id:
+						year: "$_id.year"
+						month: "$_id.month"
+						day: "$_id.day"
+						hour: "$_id.hour"
+						#minute: "$_id.minute"
+						user: "$_id.user"
+					count:
+						$sum: 1
+
+			aggregate.push
+				$match:
+					count: options.deviceCount
+
+			aggregate.push
+				$group:
+					_id: "$_id.user"
+
+			aggregate.push
+				$group:
+					_id: "count"
+					count:
+						$sum: 1
+
+			aggregated = Logs.aggregate aggregate
+			if aggregated.length
+				value = aggregated[0].count
+			else
+				value = 0
+
+		when "sessions"
+			match["device.sessionId"] =
+				$exists: true
+				$ne: null
+
+			aggregate.push
+				$group:
+					_id: "$device.sessionId"
+
+			aggregate.push
+				$group:
+					_id: "count"
+					count:
+						$sum: 1
+
+			aggregated = Logs.aggregate aggregate
+			if aggregated.length
+				value = aggregated[0].count
+			else
+				value = 0
+
 		when "browser"
 			match["device.browser"] = options.browser
 			match.type =
@@ -475,7 +754,13 @@ computeAggregatedValue = (appId, view, from, to, options) ->
 
 			value = Logs.find(match).count()
 
-		when "global-viewsByLocation"
+		when "views"
+			match.type =
+				$in: ["connected", "location"]
+
+			value = Logs.find(match).count()
+
+		when "uniqueViews"
 			match.location =
 				$exists: true
 				$ne: null
@@ -483,24 +768,21 @@ computeAggregatedValue = (appId, view, from, to, options) ->
 				$in: ["connected", "location"]
 
 			aggregate.push
-				_id: "$location"
-				count:
-					$sum: 1
+				$group:
+					_id: "$location"
 
 			aggregate.push
-				$sort:
-					count: -1
+				$group:
+					_id: "count"
+					count:
+						$sum: 1
 
-			locations = Logs.aggregate aggregate
+			aggregated = Logs.aggregate aggregate
 
-			value =
-				locations: locations
-
-		when "views"
-			match.type =
-				$in: ["connected", "location"]
-
-			value = Logs.find(match).count()
+			if aggregated.length
+				value = aggregated[0].count
+			else
+				value = 0
 
 		when "logs"
 
@@ -528,27 +810,6 @@ computeValue = (logs, view, options) ->
 		value
 
 	switch view
-
-		when "global-usersByLocationSubstring"
-			assign = (map, element) ->
-				if element.location
-					words = element.location.match(/\w+/g)
-					if words
-						for word in words
-							if not map[word]
-								map[word] = {}
-							map[word][element.userIdentifier] = 1
-			reduce = (value) ->
-				Object.keys(value).length
-
-		when "global-usersByFullLocation"
-			assign = (map, element) ->
-				if element.location
-					if not map[element.location]
-						map[element.location] = {}
-					map[element.location][element.userIdentifier] = 1
-			reduce = (value) ->
-				Object.keys(value).length
 
 		when "global-timeOnline"
 			assign = (map, element) ->
@@ -627,62 +888,6 @@ computeValue = (logs, view, options) ->
 						"Time online": 0
 				nmap
 
-		when "global-devicesPerUser"
-			assign = (map, element) ->
-				if element.userIdentifier
-					if not map[element.userIdentifier]
-						map[element.userIdentifier] = {}
-					map[element.userIdentifier][element.device.id] = 1
-			transform = (map) ->
-				byNumber = {}
-				for user, devices of map
-					number = Object.keys(devices).length
-					if number is 1
-						key = "1 device"
-					else
-						key = "#{number} devices"
-					if not byNumber[key]
-						byNumber[key] = 1
-					else
-						byNumber[key]++
-				byNumber
-
-		when "global-uniquePages"
-			assign = (map, element) ->
-				if element.type in ["connected", "location"]
-					if not map["Pages"]
-						map["Pages"] = {}
-					map["Pages"][element.location] = 1
-			reduce = (value) ->
-				Object.keys(value).length
-
-		when "global-browsers"
-			assign = (map, element) ->
-				key = element.device.browser
-				if not map[key]
-					map[key] = {}
-				map[key][element.device.id] = 1
-			reduce = (value) ->
-				Object.keys(value).length
-
-		when "global-browserVersions"
-			assign = (map, element) ->
-				key = "#{element.device.browser} #{element.device.browserVersion}"
-				if not map[key]
-					map[key] = {}
-				map[key][element.device.id] = 1
-			reduce = (value) ->
-				Object.keys(value).length
-
-		when "global-oses"
-			assign = (map, element) ->
-				key = element.device.os
-				if not map[key]
-					map[key] = {}
-				map[key][element.device.id] = 1
-			reduce = (value) ->
-				Object.keys(value).length
-
 		when "global-deviceTypes"
 			deviceTypes = {}
 			logs.forEach (l) ->
@@ -735,13 +940,6 @@ computeValue = (logs, view, options) ->
 						map[key] = 1
 					else
 						map[key]++
-
-		when "user-logs"
-			assign = (map, element) ->
-				if not map[element.device.id]
-					map[element.device.id] = 1
-				else
-					map[element.device.id]++
 
 		else
 			throw new Meteor.Error "Unknown view: #{view}"

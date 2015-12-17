@@ -10,6 +10,11 @@ Array.prototype.remove ?= (args...) ->
   output = output[0] if args.length is 1
   output
 
+# Dates
+
+@utcNow = ->
+	moment(moment().format('LL'), 'LL').startOf('day')
+
 # Logging, debugging and error handling
 
 # Log error to console and alert

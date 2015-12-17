@@ -1,26 +1,47 @@
+
 Views.Timeline = React.createClass
 	mixins: [ReactUtils]
-	modes:
-		global: "Global"
-		user: "User"
-		device: "Device"
+	ranges:
+		Today: [
+			moment().format(Constants.dateFormat)
+			moment().format(Constants.dateFormat)
+		]
+		"Last 2 Days": [
+			moment().subtract(2, 'days').format(Constants.dateFormat)
+			moment().subtract(1, 'day').format(Constants.dateFormat)
+		]
+		"Last 7 Days": [
+			moment().subtract(7, 'days').format(Constants.dateFormat)
+			moment().subtract(1, 'days').format(Constants.dateFormat)
+		]
+		"Last month": [
+			moment().subtract(1, 'month').format(Constants.dateFormat)
+			moment().subtract(1, 'days').format(Constants.dateFormat)
+		]
+		"Last 3 months": [
+			moment().subtract(3, "months").format(Constants.dateFormat)
+			moment().subtract(1, 'days').format(Constants.dateFormat)
+		]
+		"Last 6 months": [
+			moment().subtract(6, "months").format(Constants.dateFormat)
+			moment().subtract(1, 'days').format(Constants.dateFormat)
+		]
 	displays:
-		global:
-			general: "General"
-			timeOnline: "Time online"
-			timeOnlineByDeviceType: "Time online by device type"
-			averageTimeOnline: "Average time online"
-			devicesPerUser: "Users by number of devices"
-			uniquePages: "Unique page views"
-			deviceTypes: "Device types"
-			deviceTypeCombinations: "Device type combinations"
+		general: "General"
+		timeOnline: "Time online"
+		timeOnlineByDeviceType: "Time online by device type"
+		averageTimeOnline: "Average time online"
+		deviceTypeCombinations: "Device type combinations"
 	data:
 		users: "Users"
 		devices: "Devices"
+		sessions: "Sessions"
 		logs: "Logs"
 		views: "Views"
+		uniqueViews: "Unique views"
 		logins: "Logins"
 		logouts: "Logouts"
+		deviceTypes: "Device types"
 	granularities:
 		auto: "Auto"
 		day: "Day"
@@ -34,209 +55,224 @@ Views.Timeline = React.createClass
 	userViews:
 		views: "By views"
 		devices: "By devices"
+	deviceCombinationsViews:
+		overall: "Overall"
+		coincident: "Coincident"
 	timeline: null
 	chart: null
 	currentChart: null
 	labels: []
-	values: {}
+
 	getInitialState: ->
-		from: moment().subtract(6, 'days').toDate()
-		to: new Date()
+		from: moment().startOf('day').subtract(7, 'days').toDate()
+		to: moment().endOf('day').subtract(1, 'days').toDate()
 		granularity: 'auto'
-		mode: 'global'
-		display:
-			global: 'general'
-		data:
-			users: true
-
-		visibleData: {}
-		visibleView: null
-		visibleFrom: null
-		visibleTo: null
-		visibleGranularity: null
-
-		activeUsers: {}
-		activeDevices: {}
-		activeBrowsers: {}
-		activeBrowserVersions: {}
-		activeLocations: {}
-		activeOSes: {}
-		activePatterns: {}
+		display: 'general'
 
 		locations: null
 		browsers: null
 		oses: null
 		users: null
+		deviceCombinations: null
+		deviceTypes: null
 
-		userView: "views"
-		browserView: "views"
+		patterns: []
 
-		locationSubstrings: null
+		values: {}
+
+		views:
+			users: "views"
+			browsers: "views"
+			deviceCombinations: "overall"
 
 		pattern: ""
 	componentDidMount: ->
 		@timeline = document.getElementById("timeline")
+		@loadGlobalValue "users"
 		@loadAllValues()
-	#componentDidUpdate: (prevProps, prevState) ->
-		#if !@visibleStateUpToDate()
-			#@load()
-	updateVisibleState: ->
+	setView: (name, value) ->
+		self = @
+		set = {}
+		set.views = @state.views
+		set.views[name] = value
+		@setState set
+		, ->
+			self.loadValues name, "#{name}-#{value}"
+	loadAllValueSets: ->
+		self = @
+		values = @state.values
+		for label, data of values
+			delete(data.values)
 		@setState
-			visibleView: @view()
-			visibleFrom: @state.from
-			visibleTo: @state.to
-			visibleGranularity: @state.granularity
-	visibleStateUpToDate: ->
-		visible = @view() == @state.visibleView and @state.from == @state.visibleFrom and @state.to == @state.visibleTo and @state.granularity == @state.visibleGranularity
+			values: values
+		, ->
+			self.lineChart()
+			for label, data of self.state.values
+				self.loadValueSet label
 	loadAllValues: ->
 		log "Load all values"
+		@loadAllValueSets()
+		@loadValues "deviceTypes", "device-types"
+		@loadValues "deviceCombinations", "deviceCombinations-#{@state.views.deviceCombinations}"
+		@loadValues "browsers", "browsers-#{@state.views.users}"
+		@loadValues "oses"
+		@loadValues "locations"
+		@loadValues "users", "users-#{@state.views.users}"
+	loadValues: (type, view) ->
+		if !view
+			view = type
 		self = @
-		for name, active of @state.data
-			@loadValue name
-		for name, active of @state.activeLocations
-			@loadLocation name
-		for name, active of @state.activeBrowsers
-			@loadBrowser name
-		for name, active of @state.activeOSes
-			@loadOS name
-		for name, active of @state.activeUsers
-			@loadUser name
-		for name, active of @state.activeDevices
-			@loadDevice name
-		@loadBrowsers()
-		@loadLocations()
-		@loadUsers()
-		@loadOSes()
-	loadLocations: ->
+		set = {}
+		set[type] = null
+		self.setState set, ->
+			Meteor.call 'getAggregatedValues', self.props.appId, view, self.state.from, self.state.to, {}, handleResult null, (r) ->
+				set = {}
+				set[type] = r
+				self.setState set
+	setValueSet: (label, data) ->
 		self = @
-		Meteor.call 'getAggregatedValues', @props.appId, "locations", @state.from, @state.to, handleResult null, (r) ->
-			self.setState
-				locations: r
-	loadUsers: ->
+		values = @state.values
+		data.color = colorPair 0.5
+		if values[label]
+			delete(values[label])
+			@setState
+				values: values
+			, @lineChart
+		else
+			values[label] = data
+			@setState
+				values: values
+			, @wrap(@loadValueSet, label)
+	deleteValue: (label) ->
 		self = @
-		Meteor.call 'getAggregatedValues', @props.appId, "users-#{@state.userView}", @state.from, @state.to, handleResult null, (r) ->
-			self.setState
-				users: r
-	loadOSes: ->
-		self = @
-		Meteor.call 'getAggregatedValues', @props.appId, "oses", @state.from, @state.to, handleResult null, (r) ->
-			self.setState
-				oses: r
-	loadBrowsers: ->
-		self = @
-		Meteor.call 'getAggregatedValues', @props.appId, "browsers-#{@state.browserView}", @state.from, @state.to, handleResult null, (r) ->
-			self.setState
-				browsers: r
-	addPattern: ->
-		activePatterns = @state.activePatterns
-		pattern = @state.pattern
-		activePatterns[pattern] = true
+		values = @state.values
+		delete(values[label])
 		@setState
-			activePatterns: activePatterns
+			values: values
+		, ->
+			self.lineChart()
+	loadValueSet: (label) ->
+		data = @state.values[label]
+		options = {}
+		switch data.type
+			when "global"
+				view = data.name
+			when "pattern"
+				view = "location-pattern"
+				options = {pattern: data.pattern}
+			when "browser"
+				view = "browser"
+				options = {browser: data.browser}
+			when "browser-version"
+				view = "browser-version"
+				options = {browser: data.browser, version: data.version}
+			when "os"
+				view = "os"
+				options = {os: data.os}
+			when "user"
+				view = "user"
+				options = {user: data.user}
+			when "device"
+				view = "device"
+				options = {device: data.device}
+			when "location"
+				view = "location"
+				options = {location: data.location}
+			when "device-count-overall"
+				view = "device-count-overall"
+				options = {deviceCount: data.deviceCount}
+			when "device-count-coincident"
+				view = "device-count-coincident"
+				options = {deviceCount: data.deviceCount}
+			when "device-type"
+				view = "device-type"
+				options = {deviceType: data.deviceType}
+			else
+				throw new Error("unknown data type in loadValueSet")
+		self = @
+		Meteor.call 'getAnalyticsValues', @props.appId, view, @state.from, @state.to, options, @state.granularity, handleResult null, (r) ->
+			[labels, values] = r
+			self.labels = labels
+			allValues = self.state.values
+			if allValues[label]?
+				allValues[label].values = values
+				self.setState
+					values: allValues
+				, ->
+					self.lineChart()
+	addPattern: ->
+		pattern = @state.pattern
+		patterns = @state.patterns
+		patterns.push pattern
+		@setState
+			patterns: patterns
 			pattern: ""
 		, ->
 			@loadPattern pattern
-	removePattern: (pattern) ->
-		activePatterns = @state.activePatterns
-		delete(activePatterns[pattern])
-		@setState
-			activePatterns: activePatterns
-		, ->
-			@loadPattern pattern
 	loadPattern: (pattern) ->
-		self = @
-		if @state.activePatterns[pattern]
-			Meteor.call 'getAnalyticsValues', @props.appId, "location-pattern", @state.from, @state.to, {pattern: pattern}, @state.granularity, handleResult null, (r) ->
-				[labels, values] = r
-				self.labels = labels
-				self.values["Location pattern: #{pattern}"] = values
-				self.lineChart()
-		else
-			delete(@values["Location pattern: #{pattern}"])
-			self.lineChart()
-	loadValue: (name) ->
-		self = @
-		if @state.data[name]
-			Meteor.call 'getAnalyticsValues', @props.appId, name, @state.from, @state.to, {}, @state.granularity, handleResult null, (r) ->
-				[labels, values] = r
-				self.labels = labels
-				self.values[self.data[name]] = values
-				self.lineChart()
-		else
-			delete(@values[@data[name]])
-			self.lineChart()
+		@setValueSet "Location pattern: #{pattern}",
+			type: "pattern"
+			pattern: pattern
+	loadGlobalValue: (name) ->
+		@setValueSet @data[name],
+			type: "global"
+			name: name
 	loadBrowser: (browser) ->
-		self = @
-		if @state.activeBrowsers[browser]
-			Meteor.call 'getAnalyticsValues', @props.appId, "browser", @state.from, @state.to, {browser: browser}, @state.granularity, handleResult null, (r) ->
-				[labels, values] = r
-				self.labels = labels
-				self.values["Browser: #{browser}"] = values
-				self.lineChart()
-		else
-			delete(@values["Browser: #{browser}"])
-			self.lineChart()
+		@setValueSet "Browser: #{browser}",
+			type: "browser"
+			browser: browser
 	loadBrowserVersion: (browser, version) ->
-		key = "#{browser} #{version}"
-		self = @
-		if @state.activeBrowserVersions[key]
-			Meteor.call 'getAnalyticsValues', @props.appId, "browser-version", @state.from, @state.to, {browser: browser, version: version}, @state.granularity, handleResult null, (r) ->
-				[labels, values] = r
-				self.labels = labels
-				self.values["Browser: #{browser} #{version}"] = values
-				self.lineChart()
-		else
-			delete(@values["Browser: #{browser} #{version}"])
-			self.lineChart()
+		label = "Browser: #{browser} #{version}"
+		@setValueSet label,
+			type: "browser-version"
+			browser: browser
+			version: version
 	loadOS: (os) ->
-		self = @
-		if @state.activeOSes[os]
-			Meteor.call 'getAnalyticsValues', @props.appId, "os", @state.from, @state.to, {os: os}, @state.granularity, handleResult null, (r) ->
-				[labels, values] = r
-				self.labels = labels
-				self.values["OS: #{os}"] = values
-				self.lineChart()
+		label = "OS: #{os}"
+		@setValueSet label,
+			type: "os"
+			os: os
+	loadDeviceCount: (type, deviceCount) ->
+		if type is "overall"
+			type = "device-count-overall"
+			if deviceCount is 1
+				label = "1 device overall"
+			else
+				label = "#{deviceCount} devices overall"
 		else
-			delete(@values["OS: #{os}"])
-			self.lineChart()
+			type = "device-count-coincident"
+			if deviceCount is 1
+				label = "1 device"
+			else
+				label = "#{deviceCount} devices"
+		@setValueSet label,
+			type: type
+			deviceCount: deviceCount
+	loadDeviceType: (deviceType) ->
+		label = "#{deviceType} devices"
+		@setValueSet label,
+			type: "device-type"
+			deviceType: deviceType
 	loadUser: (user) ->
-		self = @
-		if @state.activeUsers[user]
-			Meteor.call 'getAnalyticsValues', @props.appId, "user", @state.from, @state.to, {user: user}, @state.granularity, handleResult null, (r) ->
-				[labels, values] = r
-				self.labels = labels
-				self.values["User: #{user}"] = values
-				self.lineChart()
-		else
-			delete(@values["User: #{user}"])
-			self.lineChart()
+		label = "User: #{user}"
+		@setValueSet label,
+			type: "user"
+			user: user
 	loadDevice: (device) ->
-		self = @
-		if @state.activeDevices[device]
-			Meteor.call 'getAnalyticsValues', @props.appId, "device", @state.from, @state.to, {device: device}, @state.granularity, handleResult null, (r) ->
-				[labels, values] = r
-				self.labels = labels
-				self.values["Device: #{device}"] = values
-				self.lineChart()
-		else
-			delete(@values["Device: #{device}"])
-			self.lineChart()
+		label = "Device: #{device}"
+		@setValueSet label,
+			type: "device"
+			device: device
 	loadLocation: (location) ->
-		self = @
-		if @state.activeLocations[location]
-			Meteor.call 'getAnalyticsValues', @props.appId, "location", @state.from, @state.to, {location: location}, @state.granularity, handleResult null, (r) ->
-				[labels, values] = r
-				self.labels = labels
-				self.values["Location: #{location}"] = values
-				self.lineChart()
-		else
-			delete(@values["Location: #{location}"])
-			self.lineChart()
+		label = "Location: #{location}"
+		@setValueSet label,
+			type: "location"
+			location: location
 	refresh: ->
 		@loadAllValues()
 	view: (state) ->
 		state = state or @state
-		"#{state.mode}-#{state.display[state.mode]}"
+		state.display
 	pieChart: (buckets) ->
 
 		colors = colorPairSeries Object.keys(buckets).length, 1
@@ -296,22 +332,26 @@ Views.Timeline = React.createClass
 		,
 			multiTooltipTemplate: "<%= datasetLabel %> - <%= value %>"
 	lineChart: ->
+		log @state.values
 		labels = @labels
 		datasets = []
-		log @values
-		for label, values of @values
-			[color, lighter] = colorPair 0.5
+		if Object.keys(@state.values).length
+			for label, data of @state.values
+				[color, lighter] = data.color
 
-			dataset =
-				label: label
-				data: values
-				fillColor: lighter
-				strokeColor: color
-				pointColor: color
-				pointStrokeColor: "white"
-				pointHighlightStroke: color
+				dataset =
+					label: label
+					data: data.values
+					fillColor: lighter
+					strokeColor: color
+					pointColor: color
+					pointStrokeColor: "white"
+					pointHighlightStroke: color
 
-			datasets.push dataset
+				datasets.push dataset
+		else
+			datasets.push
+				label: "No data"
 
 		if @currentChart
 			@currentChart.destroy()
@@ -328,177 +368,277 @@ Views.Timeline = React.createClass
 		Meteor.call 'clearCache', @props.appId, handleResult "Cache cleared"
 	render: ->
 		<div>
-			<div className="col-xs-12">
-				<h2>Timeline</h2>
-			</div>
-			<div className="col-xs-12">
-				<div className="pull-right">
-					<button className="btn btn-default" onClick={@refresh}>
-						Refresh
-					</button>
-					{" "}
-					<button className="btn btn-default" onClick={@clearCache}>
-						Clear cache
-					</button>
+			<div className="row">
+				<div className="col-xs-12">
+					<h2>Timeline</h2>
 				</div>
-			</div>
-			<div className="col-xs-12 col-sm-6">
-				<Templates.DateRangeInput id="range" label="Time range" from={@state.from} to={@state.to} onChange={@updateRange("from","to",@loadAllValues)}/>
-				<Templates.Select id="display" label="Granularity" options={@granularities} value={@state.granularity} onChange={@updateValue('granularity')}/>
-			</div>
-			<div className="col-xs-12 col-sm-6">
-				<Templates.Select id="mode" label="Mode" options={@modes} value={@state.mode} onChange={@updateValue('mode')}/>
-				<Templates.Select id="display" label="Data" options={@displays[@state.mode]} value={@state.display[@state.mode]} onChange={@updateDictValue('display', @state.mode)}/>
-			</div>
-			<div className="col-xs-12">
-				<div className="labels">
-					{
-						for name, label of @data
-							active = @state.data[name]
-							<label key={name} className={if active then "active"} onClick={@toggleDictBoolean("data", name, @wrap(@loadValue, name))}>{label}</label>
-					}
-				</div>
-			</div>
-			<div className="col-xs-12">
-				<div id="timeline-wrapper">
-					<canvas id="timeline"></canvas>
-				</div>
-			</div>
-			<div className="col-xs-12 col-sm-3">
-				<h3>Locations</h3>
-				<div className="form-group">
-					<div className="input-group">
-						<input type="text" className="form-control" value={@state.pattern} onChange={@updateValue('pattern')} onKeyDown={@onEnter(@addPattern)}/>
-						<span className="input-group-btn">
-							<button className="btn btn-primary" onClick={@addPattern}>
-								<i className="fa fa-plus"></i>
-							</button>
-						</span>
+				<div className="col-xs-12">
+					<div className="pull-right">
+						<button className="btn btn-default" onClick={@refresh}>
+							Refresh
+						</button>
+						&nbsp;
+						<button className="btn btn-default" onClick={@clearCache}>
+							Clear cache
+						</button>
 					</div>
 				</div>
-				{
-					<ul>
+				<div className="col-xs-12 col-sm-4">
+					<Templates.DateRangeInput id="range" label="Time range" from={@state.from} to={@state.to} ranges={@ranges} onChange={@updateRange("from","to", @loadAllValues)}/>
+				</div>
+				<div className="col-xs-12 col-sm-4">
+					<Templates.Select id="display" label="Granularity" options={@granularities} value={@state.granularity} onChange={@updateValue('granularity', @loadAllValueSets)}/>
+				</div>
+				<div className="col-xs-12 col-sm-4">
+					<Templates.Select id="display" label="Data" options={@displays} value={@state.display} onChange={@updateValue('display')}/>
+				</div>
+			</div>
+			<div className="row">
+				<div className="col-xs-12 col-sm-9">
+					<div id="timeline-wrapper">
+						<canvas id="timeline"></canvas>
+					</div>
+				</div>
+				<div className="col-xs-12 col-sm-3">
+					<h3>Filters</h3>
+					{
+						if @state.filters
+							<ul>
+								{
+									for label, data of @state.filters
+										<li key={label}>
+											<a>{label}</a>
+											&nbsp;
+											<button className="btn btn-danger btn-xs" onClick={@wrap(@deleteFilter,label)}>
+												<i className="fa fa-remove"></i>
+											</button>
+										</li>
+								}
+							</ul>
+						else
+							<p>No filters selected.</p>
+					}
+					<h3>Data</h3>
+					{
+						if Object.keys(@state.values).length
+							<ul>
+								{
+									for label, data of @state.values
+										<li key={label}>
+											<a style={{color: data.color[0]}} title={label}>
+												{cut(label, 25)}
+											</a>
+											&nbsp;
+											<button className="btn btn-danger btn-xs" onClick={@wrap(@deleteValue,label)}>
+												<i className="fa fa-remove"></i>
+											</button>
+										</li>
+								}
+							</ul>
+						else
+							<p>No data selected.</p>
+					}
+				</div>
+			</div>
+			<div className="row">
+				<div className="col-xs-12 col-sm-3">
+					<h3>Global data</h3>
+					<ul className="activables">
 						{
-							for pattern, active of @state.activePatterns
-								if active
-									<li key={pattern}>
-										{pattern}
-										&nbsp;
-										<button className="btn btn-danger btn-xs" onClick={@wrap(@removePattern, pattern)}>
-											<i className="fa fa-remove"></i>
-										</button>
-									</li>
+							for name, label of @data
+								valuesLabel = @data[name]
+								active = @state.values[valuesLabel]
+								<li key={name}>
+									<a className={if active then "active"} onClick={@wrap(@loadGlobalValue, name)}>
+										{label}
+									</a>
+								</li>
 						}
 					</ul>
-				}
-				{
-					if @state.locations
-						<ul className="activables">
-							{
-								for location, i in @state.locations
-									<li key={i}>
-										<a onClick={@toggleDictBoolean("activeLocations", location._id, @wrap(@loadLocation, location._id))} className={if @state.activeLocations[location._id] then "active"} title={location._id}>
-											{cut(location._id,25)} ({location.count})
-										</a>
-									</li>
-							}
-						</ul>
-					else
-						<Templates.Loading/>
-				}
-			</div>
-			<div className="col-xs-12 col-sm-3">
-				<h3>Browsers</h3>
-				<div className="labels">
+					<h3>Device types</h3>
 					{
-						for name, label of @browserViews
-							<label key={name} onClick={@setValue('browserView', name, @loadBrowsers)} className={if @state.browserView is name then "active"}>{label}</label>
+						if @state.deviceTypes
+							<ul className="activables">
+								{
+									for deviceType, i in @state.deviceTypes
+										label = "#{deviceType._id} devices"
+										<li key={i}>
+											<a onClick={@wrap(@loadDeviceType, deviceType._id)} className={if @state.values[label] then "active"}>
+												{deviceType._id or "undefined"} ({deviceType.count})
+											</a>
+										</li>
+								}
+							</ul>
+						else
+							<Templates.Loading/>
+					}
+					<h3>Number of devices</h3>
+					<div className="labels">
+						{
+							for name, label of @deviceCombinationsViews
+								<label key={name} onClick={@wrap(@setView, 'deviceCombinations', name)} className={if @state.views.deviceCombinations is name then "active"}>{label}</label>
+						}
+					</div>
+					{
+						if @state.deviceCombinations
+							<ul className="activables">
+								{
+									for deviceCount, i in @state.deviceCombinations
+										if @state.views.deviceCombinations is "overall"
+											if deviceCount._id is 1
+												label = "1 device overall"
+											else
+												label = "#{deviceCount._id} devices overall"
+										else
+											if deviceCount._id is 1
+												label = "1 device"
+											else
+												label = "#{deviceCount._id} devices"
+										<li key={i} >
+											<a onClick={@wrap(@loadDeviceCount, @state.views.deviceCombinations, deviceCount._id)} className={if @state.values[label] then "active"}>
+												{deviceCount._id or "undefined"} ({deviceCount.count})
+											</a>
+										</li>
+								}
+							</ul>
+						else
+							<Templates.Loading/>
 					}
 				</div>
-				{
-					if @state.browsers
-						<ul className="activables">
-							{
-								for browser, i in @state.browsers
-									<li key={i} >
-										<Templates.Dropdown>
-											<a onClick={@toggleDictBoolean("activeBrowsers", browser._id, @wrap(@loadBrowser, browser._id))} className={if @state.activeBrowsers[browser._id] then "active"}>
-												{browser._id or "undefined"} ({browser.count})
-											</a>
-											<ul>
-												{
-													for version, j in browser.versions
-														key = "#{browser._id} #{version.version}"
-														<li key={j}>
-															<a onClick={@toggleDictBoolean("activeBrowserVersions", key, @wrap(@loadBrowserVersion, browser._id, version.version))} className={if @state.activeBrowserVersions[key] then "active"}>
-																{version.version or "undefined"}
-																({version.count})
-															</a>
-														</li>
-												}
-											</ul>
-										</Templates.Dropdown>
-									</li>
-							}
-						</ul>
-					else
-						<Templates.Loading/>
-				}
-			</div>
-			<div className="col-xs-12 col-sm-3">
-				<h3>Operating systems</h3>
-				{
-					if @state.oses
-						<ul className="activables">
-							{
-								for os, i in @state.oses
-									<li key={i} >
-										<a onClick={@toggleDictBoolean("activeOSes", os._id, @wrap(@loadOS, os._id))} className={if @state.activeOSes[os._id]then "active"}>
-											{os._id or "undefined"} ({os.count})
-										</a>
-									</li>
-							}
-						</ul>
-					else
-						<Templates.Loading/>
-				}
-			</div>
-			<div className="col-xs-12 col-sm-3">
-				<h3>Users</h3>
-				<div className="labels">
+				<div className="col-xs-12 col-sm-3">
+					<h3>Browsers</h3>
+					<div className="labels">
+						{
+							for name, label of @browserViews
+								<label key={name} onClick={@wrap(@setView, 'browsers', name)} className={if @state.views.browsers is name then "active"}>{label}</label>
+						}
+					</div>
 					{
-						for name, label of @userViews
-							<label key={name} onClick={@setValue('userView', name, @loadUsers)} className={if @state.userView is name then "active"}>{label}</label>
+						if @state.browsers
+							<ul className="activables">
+								{
+									for browser, i in @state.browsers
+										label = "Browser: #{browser._id}"
+										<li key={i} >
+											<Templates.Dropdown>
+												<a onClick={@wrap(@loadBrowser, browser._id)} className={if @state.values[label] then "active"}>
+													{browser._id or "undefined"} ({browser.count})
+												</a>
+												<ul>
+													{
+														for version, j in browser.versions
+															label = "Browser: #{browser._id} #{version.version}"
+															<li key={j}>
+																<a onClick={@wrap(@loadBrowserVersion, browser._id, version.version)} className={if @state.values[label] then "active"}>
+																	{version.version or "undefined"}
+																	({version.count})
+																</a>
+															</li>
+													}
+												</ul>
+											</Templates.Dropdown>
+										</li>
+								}
+							</ul>
+						else
+							<Templates.Loading/>
+					}
+					<h3>Operating systems</h3>
+					{
+						if @state.oses
+							<ul className="activables">
+								{
+									for os, i in @state.oses
+										label = "OS: #{os._id}"
+										<li key={i} >
+											<a onClick={@wrap(@loadOS, os._id)} className={if @state.values[label] then "active"}>
+												{os._id or "undefined"} ({os.count})
+											</a>
+										</li>
+								}
+							</ul>
+						else
+							<Templates.Loading/>
 					}
 				</div>
-				{
-					if @state.users
-						<ul className="activables">
-							{
-								for user, i in @state.users
-									<li key={user._id}>
-										<Templates.Dropdown>
-											<a onClick={@toggleDictBoolean("activeUsers", user._id, @wrap(@loadUser, user._id))} className={if @state.activeUsers[user._id]then "active"} title={user._id}>
-												{cut(user._id,20) or "undefined"} ({user.count})
+				<div className="col-xs-12 col-sm-3">
+					<h3>Locations</h3>
+					<div className="form-group">
+						<div className="input-group">
+							<input type="text" className="form-control" value={@state.pattern} onChange={@updateValue('pattern')} onKeyDown={@onEnter(@addPattern)} placeholder="Add a location (pattern)"/>
+							<span className="input-group-btn">
+								<button className="btn btn-primary" onClick={@addPattern}>
+									<i className="fa fa-plus"></i>
+								</button>
+							</span>
+						</div>
+					</div>
+					<ul className="activables">
+						{
+							for pattern, i in @state.patterns
+								label = "Location pattern: #{pattern}"
+								<li key={i}>
+									<Templates.PatternView loadPattern={@loadPattern} pattern={pattern}
+									active={@state.values[label]}/>
+								</li>
+						}
+					</ul>
+					{
+						if @state.locations
+							<ul className="activables">
+								{
+									for location, i in @state.locations
+										label = "Location: #{location._id}"
+										<li key={i}>
+											<a onClick={@wrap(@loadLocation, location._id)} className={if @state.values[label] then "active"} title={location._id}>
+												{cut(location._id,25)} ({location.count})
 											</a>
+										</li>
+								}
+							</ul>
+						else
+							<Templates.Loading/>
+					}
+				</div>
+				<div className="col-xs-12 col-sm-3">
+					<h3>Users</h3>
+					<div className="labels">
+						{
+							for name, label of @userViews
+								<label key={name} onClick={@wrap(@setView, "users", name)} className={if @state.views.users is name then "active"}>{label}</label>
+						}
+					</div>
+					{
+						if @state.users
+							<ul className="activables">
+								{
+									for user, i in @state.users
+										label = "User: #{user._id}"
+										<li key={user._id}>
+											<Templates.Dropdown>
+												<a onClick={@wrap(@loadUser, user._id)} className={if @state.values[label] then "active"} title={user._id}>
+													{cut(user._id,20) or "undefined"} ({user.count})
+												</a>
 
-											<ul className="activables">
-												{
-													for device, j in user.devices
-														<li key={j}>
-															<a onClick={@toggleDictBoolean("activeDevices", device.id, @wrap(@loadDevice, device.id))} className={if @state.activeDevices[device.id]then "active"} title={device.id}>
-																{cut(device.id,20) or "undefined"} ({device.count})
-															</a>
-														</li>
-												}
-											</ul>
-										</Templates.Dropdown>
-									</li>
-							}
-						</ul>
-					else
-						<Templates.Loading/>
-				}
+												<ul className="activables">
+													{
+														for device, j in user.devices
+															label = "Device: #{device.id}"
+															<li key={j}>
+																<a onClick={@wrap(@loadDevice, device.id)} className={if @state.values[label] then "active"} title={device.id}>
+																	{cut(device.id,20) or "undefined"} ({device.count})
+																</a>
+															</li>
+													}
+												</ul>
+											</Templates.Dropdown>
+										</li>
+								}
+							</ul>
+						else
+							<Templates.Loading/>
+					}
+				</div>
 			</div>
 		</div>
 
@@ -540,7 +680,64 @@ rgba = (color, alpha) ->
 	"rgba(#{Math.floor(color[0])},#{Math.floor(color[1])},#{Math.floor(color[2])},#{alpha})"
 
 cut = (string, length) ->
-	if string < length
+	if string.length < length
 		string
 	else
 		"#{string[0...length/2]}...#{string[-length/2..]}"
+
+Templates.DataView = React.createClass
+	render: ->
+		label = @props.label
+		data = @props.data
+		<Templates.Dropdown>
+			<a style={{color: data.color[0]}} title={label}>
+				{cut(label, 30)}
+			</a>
+			<div>
+				<button className="btn btn-danger btn-xs" onClick={@props.onRemove}>
+					Remove
+				</button>
+			</div>
+		</Templates.Dropdown>
+
+Templates.PatternView = React.createClass
+	mixins: [ReactUtils]
+	getInitialState: ->
+		users: null
+	loadUsers: ->
+		Meteor.call 'getAggregatedValues', @props.appId, "users", @props.from, @props.to, {}, handleResult null, (r) ->
+			@setState
+				users: r
+	render: ->
+		pattern = @props.pattern
+		<Templates.Dropdown>
+			<a onClick={@wrap(@props.loadPattern, pattern)} className={if @props.active then "active"}>
+				{pattern}
+			</a>
+			<ul className="activables">
+				<li>
+					<Templates.Dropdown onOpen={@loadUsers}>
+						<a>Users</a>
+						{
+							if @state.users
+								<ul>
+									{
+										for user in @state.users
+											label = "User visits for user #{user._id} and pattern #{pattern}"
+											<li key={user._id}>
+												<a>
+													{user}
+												</a>
+											</li>
+									}
+								</ul>
+							else
+								<Templates.Loading/>
+						}
+					</Templates.Dropdown>
+				</li>
+				<li>
+					<a>Devices</a>
+				</li>
+			</ul>
+		</Templates.Dropdown>

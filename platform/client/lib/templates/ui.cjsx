@@ -12,7 +12,7 @@ Templates.Dropdown = React.createClass
 							&nbsp;<i className="fa fa-caret-up"></i>
 						</button>
 					else
-						<button className="btn btn-xs btn-naked" onClick={@setValue("open", true)}>
+						<button className="btn btn-xs btn-naked" onClick={@setValue("open", true, @props.onOpen)}>
 							<i className="fa fa-caret-down"></i>
 						</button>
 				}

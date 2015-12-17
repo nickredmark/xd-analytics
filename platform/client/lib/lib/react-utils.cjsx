@@ -61,6 +61,15 @@
 			set[dictName] = self.state[dictName]
 			set[dictName][key] = value
 			self.setState set, callback
+	setDictionaryValue: (dictName, keys..., value, callback) ->
+		set = {}
+		set[dictName] = @state[dictName]
+		current = set[dictName]
+		last = keys.splice - 1
+		for key in keys
+			current = current[key]
+		current[last] = value
+		@setState set, callback
 	updateDictValue: (dictName, keys...) ->
 		self = @
 		(e) ->

@@ -1,5 +1,24 @@
 Templates.DateRangePicker = React.createClass
 	componentDidMount: ->
+		defaultRanges =
+			Today: [
+				moment().format(@props.format)
+				moment().format(@props.format)
+			]
+			"Last 2 Days": [
+				moment().subtract(1, 'day').format(@props.format)
+				moment().format(@props.format)
+			]
+			"Last 7 Days": [
+				moment().subtract(6, 'days').format(@props.format)
+				moment().format(@props.format)
+			]
+			"Last month": [
+				moment().subtract(1, 'month').add(1, 'day').format(@props.format)
+				moment().format(@props.format)
+			]
+
+
 		self = @
 		picker = $("#daterangepicker-#{@props.id}").daterangepicker
 			singleDatePicker: @props.singleDatePicker
@@ -16,24 +35,11 @@ Templates.DateRangePicker = React.createClass
 			timePickerSeconds: true
 			timePicker24Hour: true
 			linkedCalendars: false
-			ranges:
-				Today: [
-					moment().format(@props.format)
-					moment().format(@props.format)
-				]
-				"Last 2 Days": [
-					moment().subtract(1, 'day').format(@props.format)
-					moment().format(@props.format)
-				]
-				"Last 7 Days": [
-					moment().subtract(6, 'days').format(@props.format)
-					moment().format(@props.format)
-				]
-				"Last month": [
-					moment().subtract(1, 'month').add(1, 'day').format(@props.format)
-					moment().format(@props.format)
-				]
+			ranges: @props.ranges or defaultRanges
 		, (from, to) ->
+			if !self.props.time
+				from = from.startOf("day")
+				to = to.endOf("day")
 			self.props.onChange	from.toDate(), to.toDate()
 	defaultValue: ->
 		if @props.singleDatePicker
@@ -52,7 +58,7 @@ Templates.DateRangeInput = React.createClass
 	render: ->
 		<div className="form-group">
 			<label htmlFor={"daterangepicker-#{@props.id}"}>{@props.label}</label>
-			<Templates.DateRangePicker id={@props.id} placeholder={@props.placeholder} singleDatePicker={@props.singleDate} from={@props.from} to={@props.to} date={@props.date} onChange={@props.onChange} minDate={@props.minDate} maxDate={@props.maxDate} time={@props.time} format={if @props.time then Constants.dateTimeFormat else Constants.dateFormat}/>
+			<Templates.DateRangePicker id={@props.id} placeholder={@props.placeholder} singleDatePicker={@props.singleDate} from={@props.from} to={@props.to} date={@props.date} onChange={@props.onChange} minDate={@props.minDate} maxDate={@props.maxDate} time={@props.time} format={if @props.time then Constants.dateTimeFormat else Constants.dateFormat} ranges={@props.ranges}/>
 		</div>
 
 Templates.Date = React.createClass

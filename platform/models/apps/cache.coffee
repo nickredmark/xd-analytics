@@ -12,11 +12,16 @@ Schemas.Cache = new SimpleSchema
 		type: Date
 	to:
 		type: Date
-	value:
-		type: Number
-		decimal: true
 	options:
 		type: Object
 		blackbox: true
+	value:
+		type: Number
+		decimal: true
+		optional: true
+	valueObject:
+		type: [Object]
+		blackbox: true
+		optional: true
 
 Cache.attachSchema Schemas.Cache
