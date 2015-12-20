@@ -20,7 +20,7 @@ Templates.App = React.createClass
 		else
 			"/apps/#{@props.appId}/#{view}"
 	render: ->
-		<article className="container">
+		<article>
 			{
 				if @data.ready
 					if @data.app
@@ -57,7 +57,7 @@ Templates.App = React.createClass
 						</div>
 					</div>
 			}
-			<div className="row">
+			<div>
 				{
 					if @data.ready
 						switch @view()

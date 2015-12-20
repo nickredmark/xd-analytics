@@ -26,28 +26,26 @@ Views.Timeline = React.createClass
 			moment().subtract(6, "months").format(Constants.dateFormat)
 			moment().subtract(1, 'days').format(Constants.dateFormat)
 		]
-	displays:
-		general: "General"
-		timeOnline: "Time online"
-		timeOnlineByDeviceType: "Time online by device type"
-		averageTimeOnline: "Average time online"
-		deviceTypeCombinations: "Device type combinations"
-	data:
+	views:
+		logs: "Events"
 		users: "Users"
 		devices: "Devices"
 		sessions: "Sessions"
-		logs: "Logs"
-		views: "Views"
-		uniqueViews: "Unique views"
-		logins: "Logins"
-		logouts: "Logouts"
 		deviceTypes: "Device types"
+		browsers: "Browsers"
+		browserVersions: "Browser versions"
+		oses: "Operating systems"
+		locations: "Unique locations"
 	granularities:
 		auto: "Auto"
 		day: "Day"
 		week: "Week"
 		month: "Month"
 		global: "Global"
+	logTypes:
+		view: "View"
+		login: "Log in"
+		logout: "Log out"
 	browserViews:
 		views: "By views"
 		devices: "By devices"
@@ -56,8 +54,8 @@ Views.Timeline = React.createClass
 		views: "By views"
 		devices: "By devices"
 	deviceCombinationsViews:
-		overall: "Overall"
 		coincident: "Coincident"
+		overall: "Overall"
 	timeline: null
 	chart: null
 	currentChart: null
@@ -67,28 +65,59 @@ Views.Timeline = React.createClass
 		from: moment().startOf('day').subtract(7, 'days').toDate()
 		to: moment().endOf('day').subtract(1, 'days').toDate()
 		granularity: 'auto'
-		display: 'general'
 
+		# Filter lists
 		locations: null
 		browsers: null
 		oses: null
 		users: null
 		deviceCombinations: null
 		deviceTypes: null
-
+		pattern: ""
 		patterns: []
 
 		values: {}
 
+		view: "logs"
+
 		views:
 			users: "views"
 			browsers: "views"
-			deviceCombinations: "overall"
+			deviceCombinations: "coincident"
 
-		pattern: ""
+		filters:
+			logType: "view"
+
+	addDataset: ->
+		label = @views[@state.view]
+		parts = for key, value of @state.filters
+			"#{key}: #{value}"
+		if parts.length
+			label += " (#{parts.join(", ")})"
+		options = {}
+		for key, value of @state.filters
+			options[key] = value
+		data =
+			view: @state.view
+			options: options
+		@setValueSet label, data
+	setValueSet: (label, data) ->
+		self = @
+		values = @state.values
+		data.color = colorPair 0.5
+		if values[label]
+			delete(values[label])
+			@setState
+				values: values
+			, @lineChart
+		else
+			values[label] = data
+			@setState
+				values: values
+			, @wrap(@loadValueSet, label)
 	componentDidMount: ->
 		@timeline = document.getElementById("timeline")
-		@loadGlobalValue "users"
+		@addDataset()
 		@loadAllValues()
 	setView: (name, value) ->
 		self = @
@@ -98,7 +127,7 @@ Views.Timeline = React.createClass
 		@setState set
 		, ->
 			self.loadValues name, "#{name}-#{value}"
-	loadAllValueSets: ->
+	loadAllDatasets: ->
 		self = @
 		values = @state.values
 		for label, data of values
@@ -111,7 +140,7 @@ Views.Timeline = React.createClass
 				self.loadValueSet label
 	loadAllValues: ->
 		log "Load all values"
-		@loadAllValueSets()
+		@loadAllDatasets()
 		@loadValues "deviceTypes", "device-types"
 		@loadValues "deviceCombinations", "deviceCombinations-#{@state.views.deviceCombinations}"
 		@loadValues "browsers", "browsers-#{@state.views.users}"
@@ -129,20 +158,6 @@ Views.Timeline = React.createClass
 				set = {}
 				set[type] = r
 				self.setState set
-	setValueSet: (label, data) ->
-		self = @
-		values = @state.values
-		data.color = colorPair 0.5
-		if values[label]
-			delete(values[label])
-			@setState
-				values: values
-			, @lineChart
-		else
-			values[label] = data
-			@setState
-				values: values
-			, @wrap(@loadValueSet, label)
 	deleteValue: (label) ->
 		self = @
 		values = @state.values
@@ -153,42 +168,8 @@ Views.Timeline = React.createClass
 			self.lineChart()
 	loadValueSet: (label) ->
 		data = @state.values[label]
-		options = {}
-		switch data.type
-			when "global"
-				view = data.name
-			when "pattern"
-				view = "location-pattern"
-				options = {pattern: data.pattern}
-			when "browser"
-				view = "browser"
-				options = {browser: data.browser}
-			when "browser-version"
-				view = "browser-version"
-				options = {browser: data.browser, version: data.version}
-			when "os"
-				view = "os"
-				options = {os: data.os}
-			when "user"
-				view = "user"
-				options = {user: data.user}
-			when "device"
-				view = "device"
-				options = {device: data.device}
-			when "location"
-				view = "location"
-				options = {location: data.location}
-			when "device-count-overall"
-				view = "device-count-overall"
-				options = {deviceCount: data.deviceCount}
-			when "device-count-coincident"
-				view = "device-count-coincident"
-				options = {deviceCount: data.deviceCount}
-			when "device-type"
-				view = "device-type"
-				options = {deviceType: data.deviceType}
-			else
-				throw new Error("unknown data type in loadValueSet")
+		view = data.view
+		options = data.options
 		self = @
 		Meteor.call 'getAnalyticsValues', @props.appId, view, @state.from, @state.to, options, @state.granularity, handleResult null, (r) ->
 			[labels, values] = r
@@ -207,16 +188,10 @@ Views.Timeline = React.createClass
 		@setState
 			patterns: patterns
 			pattern: ""
-		, ->
-			@loadPattern pattern
 	loadPattern: (pattern) ->
 		@setValueSet "Location pattern: #{pattern}",
 			type: "pattern"
 			pattern: pattern
-	loadGlobalValue: (name) ->
-		@setValueSet @data[name],
-			type: "global"
-			name: name
 	loadBrowser: (browser) ->
 		@setValueSet "Browser: #{browser}",
 			type: "browser"
@@ -269,10 +244,7 @@ Views.Timeline = React.createClass
 			type: "location"
 			location: location
 	refresh: ->
-		@loadAllValues()
-	view: (state) ->
-		state = state or @state
-		state.display
+		@loadAllDatasets()
 	pieChart: (buckets) ->
 
 		colors = colorPairSeries Object.keys(buckets).length, 1
@@ -366,58 +338,44 @@ Views.Timeline = React.createClass
 			bezierCurve: false
 	clearCache: ->
 		Meteor.call 'clearCache', @props.appId, handleResult "Cache cleared"
+	setBrowserVersion: (browser, browserVersion)->
+		filters = @state.filters
+		if filters.browser is browser and filters.browserVersion is browserVersion
+			delete(filters.browserVersion)
+		else
+			filters.browser = browser
+			filters.browserVersion = browserVersion
+		@setState
+			filter: filters
 	render: ->
 		<div>
-			<div className="row">
+			<div>
 				<div className="col-xs-12">
 					<h2>Timeline</h2>
-				</div>
-				<div className="col-xs-12">
-					<div className="pull-right">
-						<button className="btn btn-default" onClick={@refresh}>
-							Refresh
-						</button>
-						&nbsp;
-						<button className="btn btn-default" onClick={@clearCache}>
-							Clear cache
-						</button>
-					</div>
 				</div>
 				<div className="col-xs-12 col-sm-4">
 					<Templates.DateRangeInput id="range" label="Time range" from={@state.from} to={@state.to} ranges={@ranges} onChange={@updateRange("from","to", @loadAllValues)}/>
 				</div>
 				<div className="col-xs-12 col-sm-4">
-					<Templates.Select id="display" label="Granularity" options={@granularities} value={@state.granularity} onChange={@updateValue('granularity', @loadAllValueSets)}/>
+					<Templates.Select id="granularity" label="Granularity" options={@granularities} value={@state.granularity} onChange={@updateValue('granularity', @loadAllDatasets)}/>
 				</div>
 				<div className="col-xs-12 col-sm-4">
-					<Templates.Select id="display" label="Data" options={@displays} value={@state.display} onChange={@updateValue('display')}/>
+					<button className="btn btn-default" onClick={@refresh}>
+						Refresh
+					</button>
+					&nbsp;
+					<button className="btn btn-default" onClick={@clearCache}>
+						Clear cache
+					</button>
 				</div>
 			</div>
-			<div className="row">
+			<div>
 				<div className="col-xs-12 col-sm-9">
 					<div id="timeline-wrapper">
-						<canvas id="timeline"></canvas>
+						<canvas id="timeline" height="50"></canvas>
 					</div>
 				</div>
 				<div className="col-xs-12 col-sm-3">
-					<h3>Filters</h3>
-					{
-						if @state.filters
-							<ul>
-								{
-									for label, data of @state.filters
-										<li key={label}>
-											<a>{label}</a>
-											&nbsp;
-											<button className="btn btn-danger btn-xs" onClick={@wrap(@deleteFilter,label)}>
-												<i className="fa fa-remove"></i>
-											</button>
-										</li>
-								}
-							</ul>
-						else
-							<p>No filters selected.</p>
-					}
 					<h3>Data</h3>
 					{
 						if Object.keys(@state.values).length
@@ -426,7 +384,7 @@ Views.Timeline = React.createClass
 									for label, data of @state.values
 										<li key={label}>
 											<a style={{color: data.color[0]}} title={label}>
-												{cut(label, 25)}
+												{label}
 											</a>
 											&nbsp;
 											<button className="btn btn-danger btn-xs" onClick={@wrap(@deleteValue,label)}>
@@ -440,30 +398,44 @@ Views.Timeline = React.createClass
 					}
 				</div>
 			</div>
-			<div className="row">
-				<div className="col-xs-12 col-sm-3">
-					<h3>Global data</h3>
+			<div>
+				<div className="col-xs-12">
+					<h3>Select data</h3>
+					<button onClick={@addDataset} className="btn btn-primary pull-right">
+						Add
+					</button>
+					<div className="labels">
+						{
+							for name, label of @views
+								<label key={name} className={"#{if @state.view is name then "active"}"} onClick={@setValue('view',name)}>{label}</label>
+						}
+					</div>
+				</div>
+			</div>
+			<div>
+				<div className="col-xs-12">
+					<h3>Filter data</h3>
+				</div>
+			</div>
+			<div>
+				<div className="col-xs-12 col-sm-3 col-lg-2">
+					<h4>Event types</h4>
 					<ul className="activables">
 						{
-							for name, label of @data
-								valuesLabel = @data[name]
-								active = @state.values[valuesLabel]
-								<li key={name}>
-									<a className={if active then "active"} onClick={@wrap(@loadGlobalValue, name)}>
-										{label}
-									</a>
+							for logType, label of @logTypes
+								<li key={logType}>
+									<a onClick={@toggleDictValue("filters", "logType", logType)} className={if @state.filters.logType is logType then "active"}>{label}</a>
 								</li>
 						}
 					</ul>
-					<h3>Device types</h3>
+					<h4>Device types</h4>
 					{
 						if @state.deviceTypes
 							<ul className="activables">
 								{
 									for deviceType, i in @state.deviceTypes
-										label = "#{deviceType._id} devices"
 										<li key={i}>
-											<a onClick={@wrap(@loadDeviceType, deviceType._id)} className={if @state.values[label] then "active"}>
+											<a onClick={@toggleDictValue("filters", "deviceType", deviceType._id)} className={if @state.filters.deviceType is deviceType._id then "active"}>
 												{deviceType._id or "undefined"} ({deviceType.count})
 											</a>
 										</li>
@@ -472,7 +444,7 @@ Views.Timeline = React.createClass
 						else
 							<Templates.Loading/>
 					}
-					<h3>Number of devices</h3>
+					<h4>Number of devices</h4>
 					<div className="labels">
 						{
 							for name, label of @deviceCombinationsViews
@@ -484,18 +456,15 @@ Views.Timeline = React.createClass
 							<ul className="activables">
 								{
 									for deviceCount, i in @state.deviceCombinations
+										active = false
 										if @state.views.deviceCombinations is "overall"
-											if deviceCount._id is 1
-												label = "1 device overall"
-											else
-												label = "#{deviceCount._id} devices overall"
+											field = "deviceCount"
 										else
-											if deviceCount._id is 1
-												label = "1 device"
-											else
-												label = "#{deviceCount._id} devices"
+											field = "coincidentDeviceCount"
+										if @state.filters[field] is deviceCount._id
+											active = true
 										<li key={i} >
-											<a onClick={@wrap(@loadDeviceCount, @state.views.deviceCombinations, deviceCount._id)} className={if @state.values[label] then "active"}>
+											<a onClick={@toggleDictValue("filters", field, deviceCount._id)} className={if active then "active"}>
 												{deviceCount._id or "undefined"} ({deviceCount.count})
 											</a>
 										</li>
@@ -505,8 +474,8 @@ Views.Timeline = React.createClass
 							<Templates.Loading/>
 					}
 				</div>
-				<div className="col-xs-12 col-sm-3">
-					<h3>Browsers</h3>
+				<div className="col-xs-12 col-sm-3 col-lg-2">
+					<h4>Browsers</h4>
 					<div className="labels">
 						{
 							for name, label of @browserViews
@@ -518,18 +487,16 @@ Views.Timeline = React.createClass
 							<ul className="activables">
 								{
 									for browser, i in @state.browsers
-										label = "Browser: #{browser._id}"
 										<li key={i} >
 											<Templates.Dropdown>
-												<a onClick={@wrap(@loadBrowser, browser._id)} className={if @state.values[label] then "active"}>
+												<a onClick={@toggleDictValue("filters", "browser", browser._id)} className={if @state.filters.browser is browser._id then "active"}>
 													{browser._id or "undefined"} ({browser.count})
 												</a>
 												<ul>
 													{
 														for version, j in browser.versions
-															label = "Browser: #{browser._id} #{version.version}"
 															<li key={j}>
-																<a onClick={@wrap(@loadBrowserVersion, browser._id, version.version)} className={if @state.values[label] then "active"}>
+																<a onClick={@wrap(@setBrowserVersion,browser._id, version.version)} className={if @state.filters.browser is browser._id and @state.filters.browserVersion is version.version then "active"}>
 																	{version.version or "undefined"}
 																	({version.count})
 																</a>
@@ -543,15 +510,14 @@ Views.Timeline = React.createClass
 						else
 							<Templates.Loading/>
 					}
-					<h3>Operating systems</h3>
+					<h4>Operating systems</h4>
 					{
 						if @state.oses
 							<ul className="activables">
 								{
 									for os, i in @state.oses
-										label = "OS: #{os._id}"
 										<li key={i} >
-											<a onClick={@wrap(@loadOS, os._id)} className={if @state.values[label] then "active"}>
+											<a onClick={@toggleDictValue("filters", "os", os._id)} className={if @state.filters.os is os._id then "active"}>
 												{os._id or "undefined"} ({os.count})
 											</a>
 										</li>
@@ -561,8 +527,8 @@ Views.Timeline = React.createClass
 							<Templates.Loading/>
 					}
 				</div>
-				<div className="col-xs-12 col-sm-3">
-					<h3>Locations</h3>
+				<div className="col-xs-12 col-sm-3 col-lg-2">
+					<h4>Locations</h4>
 					<div className="form-group">
 						<div className="input-group">
 							<input type="text" className="form-control" value={@state.pattern} onChange={@updateValue('pattern')} onKeyDown={@onEnter(@addPattern)} placeholder="Add a location (pattern)"/>
@@ -576,10 +542,10 @@ Views.Timeline = React.createClass
 					<ul className="activables">
 						{
 							for pattern, i in @state.patterns
-								label = "Location pattern: #{pattern}"
 								<li key={i}>
-									<Templates.PatternView loadPattern={@loadPattern} pattern={pattern}
-									active={@state.values[label]}/>
+									<a onClick={@toggleDictValue("filters", "locationPattern", pattern)} className={if @state.filters.locationPattern is pattern then "active"}>
+										{pattern}
+									</a>
 								</li>
 						}
 					</ul>
@@ -588,9 +554,8 @@ Views.Timeline = React.createClass
 							<ul className="activables">
 								{
 									for location, i in @state.locations
-										label = "Location: #{location._id}"
 										<li key={i}>
-											<a onClick={@wrap(@loadLocation, location._id)} className={if @state.values[label] then "active"} title={location._id}>
+											<a onClick={@toggleDictValue("filters", "location", location._id)} className={if @state.filters.location is location._id then "active"} title={location._id}>
 												{cut(location._id,25)} ({location.count})
 											</a>
 										</li>
@@ -600,8 +565,8 @@ Views.Timeline = React.createClass
 							<Templates.Loading/>
 					}
 				</div>
-				<div className="col-xs-12 col-sm-3">
-					<h3>Users</h3>
+				<div className="col-xs-12 col-sm-3 col-lg-2">
+					<h4>Users</h4>
 					<div className="labels">
 						{
 							for name, label of @userViews
@@ -613,19 +578,17 @@ Views.Timeline = React.createClass
 							<ul className="activables">
 								{
 									for user, i in @state.users
-										label = "User: #{user._id}"
 										<li key={user._id}>
 											<Templates.Dropdown>
-												<a onClick={@wrap(@loadUser, user._id)} className={if @state.values[label] then "active"} title={user._id}>
+												<a onClick={@toggleDictValue("filters", "user", user._id)} className={if @state.filters.user is user._id then "active"} title={user._id}>
 													{cut(user._id,20) or "undefined"} ({user.count})
 												</a>
 
 												<ul className="activables">
 													{
 														for device, j in user.devices
-															label = "Device: #{device.id}"
 															<li key={j}>
-																<a onClick={@wrap(@loadDevice, device.id)} className={if @state.values[label] then "active"} title={device.id}>
+																<a onClick={@toggleDictValue("filters", "device", device.id)} className={if @state.filters.device is device.id then "active"} title={device.id}>
 																	{cut(device.id,20) or "undefined"} ({device.count})
 																</a>
 															</li>
@@ -698,46 +661,4 @@ Templates.DataView = React.createClass
 					Remove
 				</button>
 			</div>
-		</Templates.Dropdown>
-
-Templates.PatternView = React.createClass
-	mixins: [ReactUtils]
-	getInitialState: ->
-		users: null
-	loadUsers: ->
-		Meteor.call 'getAggregatedValues', @props.appId, "users", @props.from, @props.to, {}, handleResult null, (r) ->
-			@setState
-				users: r
-	render: ->
-		pattern = @props.pattern
-		<Templates.Dropdown>
-			<a onClick={@wrap(@props.loadPattern, pattern)} className={if @props.active then "active"}>
-				{pattern}
-			</a>
-			<ul className="activables">
-				<li>
-					<Templates.Dropdown onOpen={@loadUsers}>
-						<a>Users</a>
-						{
-							if @state.users
-								<ul>
-									{
-										for user in @state.users
-											label = "User visits for user #{user._id} and pattern #{pattern}"
-											<li key={user._id}>
-												<a>
-													{user}
-												</a>
-											</li>
-									}
-								</ul>
-							else
-								<Templates.Loading/>
-						}
-					</Templates.Dropdown>
-				</li>
-				<li>
-					<a>Devices</a>
-				</li>
-			</ul>
 		</Templates.Dropdown>

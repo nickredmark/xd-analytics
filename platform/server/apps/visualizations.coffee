@@ -438,7 +438,6 @@ getAggregatedValues = (appId, view, from, to, options) ->
 
 	log aggregated
 
-
 getAnalyticsValue = (appId, view, from, to, options) ->
 	cache = Cache.findOne
 			appId: appId
@@ -455,32 +454,13 @@ getAnalyticsValue = (appId, view, from, to, options) ->
 		cache.value
 	else
 
-		aggregate = [
-			"users"
-			"devices"
-			"views"
-			"uniqueViews"
-			"sessions"
-			"logs"
-			"logins"
-			"logouts"
-			"location"
-			"location-pattern"
-			"browser"
-			"browser-version"
-			"os"
-			"user"
-			"device"
-			"device-count-overall"
-			"device-count-coincident"
-			"device-type"
-		]
+		value = computeAggregatedValue appId, view, from, to, options
+
+		###
 		if view in aggregate
-			value = computeAggregatedValue appId, view, from, to, options
 		else
 			preprocessLogs appId, from, to
 
-			###
 			[labels, buckets] = getBuckets from, to
 
 
@@ -507,7 +487,6 @@ getAnalyticsValue = (appId, view, from, to, options) ->
 							value[key] += parseFloat(v)
 
 			else
-			###
 			logs = Logs.find
 					appId: appId
 					date:
@@ -517,6 +496,7 @@ getAnalyticsValue = (appId, view, from, to, options) ->
 					sort:
 						date: 1
 			value = computeValue logs, view, options
+			###
 
 		if to < moment()
 			Cache.insert
@@ -537,118 +517,125 @@ computeAggregatedValue = (appId, view, from, to, options) ->
 		date:
 			$gte: from
 			$lt: to
+
+	uniqueFields = []
+
+	eliminationGroupId = {}
+
+	filteringGroups = []
+
 	aggregate.push
 		$match: match
 
+	# Filters on original data
+	if options.logType
+		switch options.logType
+			when "view"
+				match.type =
+					$in: ["connected", "location"]
+			else
+				match.type = options.logType
+	if options.deviceType
+		match["device.type"] = options.deviceType
+	if options.browser
+		match["device.browser"] = options.browser
+	if options.browserVersion
+		match["device.browserVersion"] = options.browserVersion
+	if options.os
+		match["device.os"] = options.os
+	if options.user
+		match.userIdentifier = options.user
+	if options.device
+		match["device.id"] = options.device
+	if options.session
+		match["device.sessionId"] = options.session
+	if options.locationPattern
+		match.location =
+			$regex: options.locationPattern
+	if options.location
+		match.location = options.location
+
+	# Unique
 	switch view
+		when "logs"
+			# Do nothing
+			null
 		when "users"
-			match.userIdentifier =
-				$exists: true
-				$ne: null
-
-			aggregate.push
-				$group:
-					_id: "$userIdentifier"
-
-			aggregate.push
-				$group:
-					_id: "count"
-					count:
-						$sum: 1
-
-			aggregated = Logs.aggregate aggregate
-			if aggregated.length
-				value = aggregated[0].count
-			else
-				value = 0
-
+			uniqueFields.push "userIdentifier"
 		when "devices"
-			match['device.id'] =
+			uniqueFields.push "device.id"
+		when "sessions"
+			uniqueFields.push "device.sessionId"
+		when "deviceTypes"
+			uniqueFields.push "device.type"
+		when "browsers"
+			uniqueFields.push "device.browser"
+		when "browserVersions"
+			uniqueFields.push "device.browser"
+			uniqueFields.push "device.browserVersion"
+		when "oses"
+			uniqueFields.push "device.os"
+		when "locations"
+			uniqueFields.push "location"
+
+	# Filters on aggregated data
+	if options.deviceCount
+		if !match["device.id"]
+			match["device.id"] =
 				$exists: true
 				$ne: null
-
-
-			aggregate.push
-				$group:
-					_id: "$device.id"
-
-			aggregate.push
-				$group:
-					_id: "count"
-					count:
-						$sum: 1
-
-			aggregated = Logs.aggregate aggregate
-			if aggregated.length
-				value = aggregated[0].count
-			else
-				value = 0
-
-		when "device-type"
-			match.type =
-				$in: ["connected", "location"]
-			match["device.type"] = options.deviceType
-			value = Logs.find(match).count()
-
-		when "device-count-overall"
-			match['device.id'] =
-				$exists: true
-				$ne: null
-
+		if !match.userIdentifier
 			match.userIdentifier =
 				$exists: true
 				$ne: null
 
-			aggregate.push
+		eliminationGroupId.user = "$userIdentifier"
+		eliminationGroupId.device = "$device.id"
+
+		if uniqueFields.length
+			filteringGroups.push
 				$group:
 					_id:
-						device: "$device.id"
 						user: "$userIdentifier"
-
-			aggregate.push
-				$group:
-					_id: "$_id.user"
+						device: "$device.id"
 					count:
-						$sum: 1
+						$sum: "$count"
 
-			aggregate.push
-				$match:
-					count: options.deviceCount
+		filteringGroups.push
+			$group:
+				_id: "$_id.user"
+				deviceCount:
+					$sum: 1
+				count:
+					$sum: "$count"
 
-			aggregate.push
-				$group:
-					_id: "count"
-					count:
-						$sum: 1
+		filteringGroups.push
+			$match:
+				deviceCount: options.deviceCount
 
-			aggregated = Logs.aggregate aggregate
-			if aggregated.length
-				value = aggregated[0].count
-			else
-				value = 0
-
-		when "device-count-coincident"
+	if options.coincidentDeviceCount
+		if !match["device.id"]
+			match["device.id"] =
+				$exists: true
+				$ne: null
+		if !match.userIdentifier
 			match.userIdentifier =
 				$exists: true
 				$ne: null
 
-			aggregate.push
-				$group:
-					_id:
-						year:
-							$year: "$date"
-						month:
-							$month: "$date"
-						day:
-							$dayOfMonth: "$date"
-						hour:
-							$hour: "$date"
-						#minute:
-						#	$minute: "$date"
-						user: "$userIdentifier"
-						device: "$device.id"
+		eliminationGroupId.year =
+			$year: "$date"
+		eliminationGroupId.month =
+			$month: "$date"
+		eliminationGroupId.day =
+			$dayOfMonth: "$date"
+		eliminationGroupId.hour =
+			$hour: "$date"
+		eliminationGroupId.user = "$userIdentifier"
+		eliminationGroupId.device = "$device.id"
 
-			aggregate.push
+		if uniqueFields.length
+			filteringGroups.push
 				$group:
 					_id:
 						year: "$_id.year"
@@ -657,150 +644,88 @@ computeAggregatedValue = (appId, view, from, to, options) ->
 						hour: "$_id.hour"
 						#minute: "$_id.minute"
 						user: "$_id.user"
+						device: "$_id.device"
 					count:
+						$sum: "$count"
+
+			filteringGroups.push
+				$group:
+					_id:
+						year: "$_id.year"
+						month: "$_id.month"
+						day: "$_id.day"
+						hour: "$_id.hour"
+						#minute: "$_id.minute"
+						user: "$_id.user"
+					deviceCount:
 						$sum: 1
-
-			aggregate.push
-				$match:
-					count: options.deviceCount
-
-			aggregate.push
-				$group:
-					_id: "$_id.user"
-
-			aggregate.push
-				$group:
-					_id: "count"
 					count:
+						$sum: "$count"
+
+		else
+
+			filteringGroups.push
+				$group:
+					_id:
+						year: "$_id.year"
+						month: "$_id.month"
+						day: "$_id.day"
+						hour: "$_id.hour"
+						#minute: "$_id.minute"
+						user: "$_id.user"
+					deviceCount:
 						$sum: 1
+					count:
+						$sum: "$countAll"
 
-			aggregated = Logs.aggregate aggregate
-			if aggregated.length
-				value = aggregated[0].count
-			else
-				value = 0
+		filteringGroups.push
+			$match:
+				deviceCount: options.coincidentDeviceCount
 
-		when "sessions"
-			match["device.sessionId"] =
+
+	if uniqueFields.length
+		id = {}
+		for uniqueField, i in uniqueFields
+			match[uniqueField] =
 				$exists: true
 				$ne: null
+			eliminationGroupId["uniqueField#{i}"] = "$#{uniqueField}"
 
-			aggregate.push
-				$group:
-					_id: "$device.sessionId"
+	if Object.keys(eliminationGroupId).length
+		aggregate.push
+			$group:
+				_id: eliminationGroupId
+				count:
+					$first: 1
+				countAll:
+					$sum: 1
 
-			aggregate.push
-				$group:
-					_id: "count"
-					count:
-						$sum: 1
+	if aggregate.length is 1
+		log match
+		value = Logs.find(match).count()
+	else
+		for step in filteringGroups
+			aggregate.push step
 
-			aggregated = Logs.aggregate aggregate
-			if aggregated.length
-				value = aggregated[0].count
-			else
-				value = 0
+		# Sum it all together
+		aggregate.push
+			$group:
+				_id: "count"
+				count:
+					$sum: "$count"
 
-		when "browser"
-			match["device.browser"] = options.browser
-			match.type =
-				$in: ["connected", "location"]
-			value = Logs.find(match).count()
+		for a in aggregate
+			log a
 
-		when "browser-version"
-			match["device.browser"] = options.browser
-			match["device.browserVersion"] = options.version
-			match.type =
-				$in: ["connected", "location"]
-			value = Logs.find(match).count()
-
-		when "os"
-			match["device.os"] = options.os
-			match.type =
-				$in: ["connected", "location"]
-			value = Logs.find(match).count()
-
-		when "user"
-			match.userIdentifier = options.user
-			match.type =
-				$in: ["connected", "location"]
-			value = Logs.find(match).count()
-
-		when "device"
-			match["device.id"] = options.device
-			match.type =
-				$in: ["connected", "location"]
-			value = Logs.find(match).count()
-
-		when "browser"
-			match["device.browser"] = options.browser
-			match.type =
-				$in: ["connected", "location"]
-			value = Logs.find(match).count()
-
-		when "location"
-
-			match.location = options.location
-			match.type =
-				$in: ["connected", "location"]
-			value = Logs.find(match).count()
-
-		when "location-pattern"
-
-			match.location =
-				$regex: options.pattern
-			match.type =
-				$in: ["connected", "location"]
-
-			value = Logs.find(match).count()
-
-		when "views"
-			match.type =
-				$in: ["connected", "location"]
-
-			value = Logs.find(match).count()
-
-		when "uniqueViews"
-			match.location =
-				$exists: true
-				$ne: null
-			match.type =
-				$in: ["connected", "location"]
-
-			aggregate.push
-				$group:
-					_id: "$location"
-
-			aggregate.push
-				$group:
-					_id: "count"
-					count:
-						$sum: 1
-
-			aggregated = Logs.aggregate aggregate
-
-			if aggregated.length
-				value = aggregated[0].count
-			else
-				value = 0
-
-		when "logs"
-
-			value = Logs.find(match).count()
-
-
-		when "logins"
-			match.type = "login"
-
-			value = Logs.find(match).count()
-
-		when "logouts"
-			match.type = "logout"
-
-			value = Logs.find(match).count()
+		aggregated = Logs.aggregate aggregate
+		if aggregated.length
+			value = aggregated[0].count
+		else
+			value = 0
 
 	value
 
+###
 computeValue = (logs, view, options) ->
 
 	transform = (map) ->
@@ -947,6 +872,7 @@ computeValue = (logs, view, options) ->
 	value = process logs, assign, transform, reduce
 
 	value
+###
 
 getGranularity = (from, to, granularity) ->
 	from = moment from
@@ -1016,7 +942,8 @@ Meteor.methods
 
 	getAnalyticsValues: (appId, view, from, to, options, granularity) ->
 
-		log "get analytics values #{appId} #{view} #{from} - #{to} #{options} #{granularity}"
+		log "get analytics values #{appId} #{view} #{from} - #{to} #{granularity}"
+		log options
 
 		granularity = getGranularity from, to, granularity
 
@@ -1029,7 +956,7 @@ Meteor.methods
 
 			values[i] = getAnalyticsValue appId, view, buckets[i].toDate(), moment(buckets[i+1]).subtract(1, "ms").toDate(), options
 
-		log [labels, values]
+		[labels, values]
 
 	clearCache: (appId) ->
 		cache = Cache.remove
