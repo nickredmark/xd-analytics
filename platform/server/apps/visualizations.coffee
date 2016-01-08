@@ -66,8 +66,6 @@ getAggregatedValues = (appId, view, from, to, options) ->
 				aggregate.push
 					$limit: options?.limit or 20
 
-				aggregated = Intervals.aggregate aggregate
-
 			when "browsers-views"
 
 				match.type =
@@ -101,8 +99,6 @@ getAggregatedValues = (appId, view, from, to, options) ->
 
 				aggregate.push
 					$limit: options?.limit or 20
-
-				aggregated = Intervals.aggregate aggregate
 
 			when "browsers-versions"
 				aggregate.push
@@ -141,7 +137,6 @@ getAggregatedValues = (appId, view, from, to, options) ->
 				aggregate.push
 					$limit: options?.limit or 20
 
-				aggregated = Intervals.aggregate aggregate
 			when "oses"
 
 				aggregate.push
@@ -162,9 +157,6 @@ getAggregatedValues = (appId, view, from, to, options) ->
 
 				aggregate.push
 					$limit: options?.limit or 20
-
-				aggregated = Intervals.aggregate aggregate
-
 
 			when "device-types"
 				match.deviceId =
@@ -190,8 +182,6 @@ getAggregatedValues = (appId, view, from, to, options) ->
 					$sort:
 						count: -1
 
-				aggregated = Intervals.aggregate aggregate
-
 			when "device-type-combinations"
 				match.userIdentifier =
 					$exists: true
@@ -212,8 +202,6 @@ getAggregatedValues = (appId, view, from, to, options) ->
 				aggregate.push
 					$sort:
 						count: -1
-
-				aggregated = Intervals.aggregate aggregate
 
 
 			when "device-combinations"
@@ -238,14 +226,22 @@ getAggregatedValues = (appId, view, from, to, options) ->
 					$sort:
 						count: -1
 
-				aggregated = Intervals.aggregate aggregate
-
-			when "locations"
+			when "locations-views", "locations-combinedViews"
 				match.location =
 					$exists: true
 					$ne: null
 				match.type =
 					$in: ["connected", "location"]
+				if view is "locations-combinedViews"
+					match.userIdentifier =
+						$exists: true
+						$ne: null
+					match.deviceId =
+						$exists: true
+						$ne: null
+					match["deviceTypes.1"] =
+						$exists: true
+
 
 				aggregate.push
 					$group:
@@ -260,12 +256,18 @@ getAggregatedValues = (appId, view, from, to, options) ->
 				aggregate.push
 					$limit: options?.limit or 20
 
-				aggregated = Intervals.aggregate aggregate
 
-			when "users-views", "users-devices"
+			when "users-views", "users-devices", "users-combinedViews"
 				match.userIdentifier =
 					$exists: true
 					$ne: null
+				if view is "users-combinedViews"
+					# make sure at least 2 devices have been used at the same time
+					match.deviceId =
+						$exists: true
+						$ne: null
+					match["deviceTypes.1"] =
+						$exists: true
 				match.type =
 					$in: ["connected", "location"]
 
@@ -285,7 +287,7 @@ getAggregatedValues = (appId, view, from, to, options) ->
 					$group:
 						_id: "$_id.user"
 						count:
-							$sum: if view is "users-views" then "$count" else 1
+							$sum: if view is "users-devices" then 1 else "$count"
 						devices:
 							$push:
 								id: "$_id.device"
@@ -298,10 +300,14 @@ getAggregatedValues = (appId, view, from, to, options) ->
 				aggregate.push
 					$limit: options?.limit or 20
 
-				aggregated = Intervals.aggregate aggregate
-
 			else
 				throw new Meteor.Error "Unknown view: #{view}"
+
+
+		for a in aggregate
+			log a
+
+		aggregated = Intervals.aggregate aggregate
 
 		if to < moment()
 			Cache.insert
@@ -432,9 +438,25 @@ computeAggregatedValue = (appId, view, from, to, options) ->
 		match.location = options.location
 
 	if options.deviceCount
+		if !match.userIdentifier
+			match.userIdentifier =
+				$exists: true
+				$ne: null
+		if !match.deviceId
+			match.deviceId =
+				$exists: true
+				$ne: null
 		match.deviceTypes =
 			$size: options.deviceCount
 	else if options.deviceTypeCombination
+		if !match.userIdentifier
+			match.userIdentifier =
+				$exists: true
+				$ne: null
+		if !match.deviceId
+			match.deviceId =
+				$exists: true
+				$ne: null
 		match.deviceTypes = options.deviceTypeCombination
 
 	# Unique

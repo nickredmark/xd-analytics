@@ -61,6 +61,13 @@
 			set[dictName] = self.state[dictName]
 			set[dictName][key] = value
 			self.setState set, callback
+	unsetDictValue: (dictName, key) ->
+		self = @
+		->
+			set = {}
+			set[dictName] = self.state[dictName]
+			delete(set[dictName][key])
+			self.setState set
 	toggleDictValue: (dictName, key, value, callback) ->
 		self = @
 		->

@@ -55,8 +55,12 @@ Views.Timeline = React.createClass
 		devices: "By devices"
 		versions: "By versions"
 	userViews:
+		combinedViews: "By combined views"
 		views: "By views"
 		devices: "By devices"
+	locationViews:
+		combinedViews: "By combined views"
+		views: "By views"
 	timeline: null
 	chart: null
 	currentChart: null
@@ -84,33 +88,41 @@ Views.Timeline = React.createClass
 		view: "logs"
 
 		views:
-			users: "views"
+			users: "combinedViews"
 			browsers: "views"
+			locations: "combinedViews"
 
 		filters:
 			logType: "view"
 
-	addDataset: ->
+	filterValueLabel: (key, value) ->
+		switch key
+			when "deviceType"
+				value = @deviceTypes[value-1]
+			when "deviceTypeCombination"
+				combination = for type in value
+					@deviceTypes[type-1]
+				value = combination.join("-")
+		value
+
+	currentSelectionLabel: ->
 		label = @views[@state.view]
 		parts = []
 		for key, value of @state.filters
-			switch key
-				when "deviceType"
-					value = @deviceTypes[value-1]
-				when "deviceTypeCombination"
-					combination = for type in value
-						@deviceTypes[type-1]
-					value = combination.join("-")
+			value = @filterValueLabel key, value
 			parts.push "#{key}: #{value}"
 		if parts.length
 			label += " (#{parts.join(", ")})"
+
+		label
+	addDataset: ->
 		options = {}
 		for key, value of @state.filters
 			options[key] = value
 		data =
 			view: @state.view
 			options: options
-		@setValueSet label, data
+		@setValueSet @currentSelectionLabel(), data
 	setValueSet: (label, data) ->
 		self = @
 		values = @state.values
@@ -154,9 +166,9 @@ Views.Timeline = React.createClass
 		@loadValues "deviceCombinations", "device-combinations"
 		@loadValues "deviceTypes", "device-types"
 		@loadValues "deviceTypeCombinations", "device-type-combinations"
-		@loadValues "browsers", "browsers-#{@state.views.users}"
+		@loadValues "browsers", "browsers-#{@state.views.browsers}"
 		@loadValues "oses"
-		@loadValues "locations"
+		@loadValues "locations", "locations-#{@state.views.locations}"
 		@loadValues "users", "users-#{@state.views.users}"
 	loadValues: (type, view) ->
 		if !view
@@ -343,6 +355,7 @@ Views.Timeline = React.createClass
 				</div>
 				<div className="col-xs-12 col-sm-3">
 					<h3>Data</h3>
+					<h4>Selected</h4>
 					{
 						if Object.keys(@state.values).length
 							<ul>
@@ -350,7 +363,15 @@ Views.Timeline = React.createClass
 									for label, data of @state.values
 										<li key={label}>
 											{
-												if !data.values
+												if data.values
+													total = 0
+													for value in data.values
+														total += value
+													<span style={{color: data.color[0]}}>
+														{total}
+														&nbsp;
+													</span>
+												else
 													<span>
 														<Templates.Spinner/>
 														&nbsp;
@@ -369,9 +390,30 @@ Views.Timeline = React.createClass
 						else
 							<p>No data selected.</p>
 					}
-					<button onClick={@addDataset} className="btn btn-primary">
-						Add current selection
-					</button>
+					<h4>Current</h4>
+					<span>{@views[@state.view]}</span>
+					<ul>
+						{
+							for key, value of @state.filters
+								<li key={key}>
+									<span>{key}: {@filterValueLabel(key, value)}</span>
+									&nbsp;
+									<button onClick={@unsetDictValue("filters", key)} className="btn btn-danger btn-xs">
+										<i className="fa fa-remove"></i>
+									</button>
+								</li>
+						}
+					</ul>
+					{
+						if @state.values[@currentSelectionLabel()]
+							<button onClick={@addDataset} className="btn btn-primary btn-md">
+								Remove from data
+							</button>
+						else
+							<button onClick={@addDataset} className="btn btn-primary btn-md">
+								Add to data
+							</button>
+					}
 				</div>
 			</div>
 			<div>
@@ -538,6 +580,12 @@ Views.Timeline = React.createClass
 								</li>
 						}
 					</ul>
+					<div className="labels">
+						{
+							for name, label of @locationViews
+								<label key={name} onClick={@wrap(@setView, "locations", name)} className={if @state.views.locations is name then "active"}>{label}</label>
+						}
+					</div>
 					{
 						if @state.locations
 							<ul className="activables">
@@ -581,7 +629,7 @@ Views.Timeline = React.createClass
 															active = @state.filters.device is device.id
 															<li key={j}>
 																<a onClick={@toggleDictValue("filters", "device", device.id)} className={if active then "active"} title={device.id}>
-																	{if active then device.id else cut(device.id,20) or "undefined"} ({device.count} views)
+																	{if active then device.id else cut(device.id,20) or "undefined"} ({device.count})
 																</a>
 															</li>
 													}
