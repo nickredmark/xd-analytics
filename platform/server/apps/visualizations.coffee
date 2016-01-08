@@ -1,69 +1,3 @@
-@preprocessLogs = (appId, from, to) ->
-	threshold = 1000 * 60 * 5 # 5 minutes
-	logs = Logs.find
-		appId: appId
-		date:
-			$exists: false
-	count = logs.count()
-	if count
-		log count
-		i = 0
-		logs.forEach (l) ->
-			if Math.abs(l.createdAt - l.loggedAt) > threshold
-				date = l.createdAt
-			else
-				date = l.loggedAt
-			Logs.update l._id,
-				$set:
-					date: date
-			if i % 1000 is 0
-				log i
-			i++
-
-	logs = Logs.find
-		appId: appId
-		date:
-			$gte: from
-			$lt: to
-		"device.type":
-			$exists: false
-		type:
-			$in: ["connected", "location"]
-	count = logs.count()
-	if count
-		log count
-		i = 0
-		logs.forEach (l) ->
-			diam = Math.sqrt l.device.width*l.device.width + l.device.height*l.device.height
-			if l.pixelRatio
-				realDiam = diam / l.pixelRatio
-			else
-				realDiam = diam
-			if realDiam > 1800
-				type = "xl"
-			else if realDiam > 1150
-				type = "lg"
-			else if realDiam > 500
-				type = "md"
-			else
-				type = "sm"
-			Logs.update l._id,
-				$set:
-					"device.diam": realDiam
-					"device.type": type
-			if i % 1000 is 0
-				log i
-			i++
-
-###
-reducible =
-	"global-timeOnline": 1
-	"global-timeOnlineByDeviceType": 1
-	"global-logs": 1
-	"global-views": 1
-	"global-logins": 1
-###
-
 getAggregatedValues = (appId, view, from, to, options) ->
 
 	log "get aggregated values #{appId} #{view} #{from} - #{to}"
@@ -83,12 +17,11 @@ getAggregatedValues = (appId, view, from, to, options) ->
 		aggregated = cache.valueObject
 	else
 
-		preprocessLogs appId, from, to
-
 		aggregate = []
+
 		match =
 			appId: appId
-			date:
+			interval:
 				$gte: from
 				$lt: to
 		aggregate.push
@@ -99,9 +32,10 @@ getAggregatedValues = (appId, view, from, to, options) ->
 				aggregate.push
 					$group:
 						_id:
-							device: "$device.id"
-							browser: "$device.browser"
-							version: "$device.browserVersion"
+							device: "$deviceId"
+							browser: "$browser"
+							version: "$browserVersion"
+
 
 				aggregate.push
 					$group:
@@ -132,38 +66,20 @@ getAggregatedValues = (appId, view, from, to, options) ->
 				aggregate.push
 					$limit: options?.limit or 20
 
-				aggregated = Logs.aggregate aggregate
-
-			when "device-types"
-				match["device.type"] =
-					$exists: true
-					$ne: null
-				match.type =
-					$in: ["connected", "location"]
-
-				aggregate.push
-					$group:
-						_id: "$device.type"
-						count:
-							$sum: 1
-
-				aggregate.push
-					$sort:
-						count: -1
-
-				aggregated = Logs.aggregate aggregate
+				aggregated = Intervals.aggregate aggregate
 
 			when "browsers-views"
+
 				match.type =
 					$in: ["connected", "location"]
 
 				aggregate.push
 					$group:
 						_id:
-							browser: "$device.browser"
-							version: "$device.browserVersion"
+							browser: "$browser"
+							version: "$browserVersion"
 						count:
-							$sum: 1
+							$sum: "$count"
 
 				aggregate.push
 					$sort:
@@ -186,14 +102,15 @@ getAggregatedValues = (appId, view, from, to, options) ->
 				aggregate.push
 					$limit: options?.limit or 20
 
-				aggregated = Logs.aggregate aggregate
+				aggregated = Intervals.aggregate aggregate
+
 			when "browsers-versions"
 				aggregate.push
 					$group:
 						_id:
-							device: "$device.id"
-							browser: "$device.browser"
-							version: "$device.browserVersion"
+							device: "$deviceId"
+							browser: "$browser"
+							version: "$browserVersion"
 
 				aggregate.push
 					$group:
@@ -224,14 +141,14 @@ getAggregatedValues = (appId, view, from, to, options) ->
 				aggregate.push
 					$limit: options?.limit or 20
 
-				aggregated = Logs.aggregate aggregate
+				aggregated = Intervals.aggregate aggregate
 			when "oses"
 
 				aggregate.push
 					$group:
 						_id:
-							device: "$device.id"
-							os: "$device.os"
+							device: "$deviceId"
+							os: "$os"
 
 				aggregate.push
 					$group:
@@ -246,9 +163,36 @@ getAggregatedValues = (appId, view, from, to, options) ->
 				aggregate.push
 					$limit: options?.limit or 20
 
-				aggregated = Logs.aggregate aggregate
+				aggregated = Intervals.aggregate aggregate
 
-			when "deviceCombinations-coincident"
+
+			when "device-types"
+				match.deviceId =
+					$exists: true
+					$ne: null
+				match.maxDeviceType =
+					$exists: true
+					$ne: null
+
+				aggregate.push
+					$group:
+						_id:
+							deviceId: "$deviceId"
+							deviceType: "$maxDeviceType"
+
+				aggregate.push
+					$group:
+						_id: "$_id.deviceType"
+						count:
+							$sum: 1
+
+				aggregate.push
+					$sort:
+						count: -1
+
+				aggregated = Intervals.aggregate aggregate
+
+			when "device-type-combinations"
 				match.userIdentifier =
 					$exists: true
 					$ne: null
@@ -256,41 +200,12 @@ getAggregatedValues = (appId, view, from, to, options) ->
 				aggregate.push
 					$group:
 						_id:
-							year:
-								$year: "$date"
-							month:
-								$month: "$date"
-							day:
-								$dayOfMonth: "$date"
-							hour:
-								$hour: "$date"
-							#minute:
-							#	$minute: "$date"
 							user: "$userIdentifier"
-							device: "$device.id"
+							deviceTypes: "$deviceTypes"
 
 				aggregate.push
 					$group:
-						_id:
-							year: "$_id.year"
-							month: "$_id.month"
-							day: "$_id.day"
-							hour: "$_id.hour"
-							#minute: "$_id.minute"
-							user: "$_id.user"
-						count:
-							$sum: 1
-
-				aggregate.push
-					$group:
-						_id:
-							user: "$_id.user"
-						count:
-							$max: "$count"
-
-				aggregate.push
-					$group:
-						_id: "$count"
+						_id: "$_id.deviceTypes"
 						count:
 							$sum: 1
 
@@ -298,25 +213,24 @@ getAggregatedValues = (appId, view, from, to, options) ->
 					$sort:
 						count: -1
 
-				aggregated = Logs.aggregate aggregate
+				aggregated = Intervals.aggregate aggregate
 
-			when "deviceCombinations-overall"
+
+			when "device-combinations"
+				match.userIdentifier =
+					$exists: true
+					$ne: null
 
 				aggregate.push
 					$group:
 						_id:
-							device: "$device.id"
 							user: "$userIdentifier"
+							devices:
+								$size: "$deviceTypes"
 
 				aggregate.push
 					$group:
-						_id: "$_id.device"
-						count:
-							$sum: 1
-
-				aggregate.push
-					$group:
-						_id: "$count"
+						_id: "$_id.devices"
 						count:
 							$sum: 1
 
@@ -324,7 +238,7 @@ getAggregatedValues = (appId, view, from, to, options) ->
 					$sort:
 						count: -1
 
-				aggregated = Logs.aggregate aggregate
+				aggregated = Intervals.aggregate aggregate
 
 			when "locations"
 				match.location =
@@ -337,7 +251,7 @@ getAggregatedValues = (appId, view, from, to, options) ->
 					$group:
 						_id: "$location"
 						count:
-							$sum: 1
+							$sum: "$count"
 
 				aggregate.push
 					$sort:
@@ -346,9 +260,9 @@ getAggregatedValues = (appId, view, from, to, options) ->
 				aggregate.push
 					$limit: options?.limit or 20
 
-				aggregated = Logs.aggregate aggregate
+				aggregated = Intervals.aggregate aggregate
 
-			when "users-views"
+			when "users-views", "users-devices"
 				match.userIdentifier =
 					$exists: true
 					$ne: null
@@ -359,47 +273,9 @@ getAggregatedValues = (appId, view, from, to, options) ->
 					$group:
 						_id:
 							user: "$userIdentifier"
-							device: "$device.id"
-						count:
-							$sum: 1
-
-				aggregate.push
-					$sort:
-						count: -1
-
-				aggregate.push
-					$group:
-						_id: "$_id.user"
+							device: "$deviceId"
 						count:
 							$sum: "$count"
-						devices:
-							$push:
-								id: "$_id.device"
-								count: "$count"
-
-				aggregate.push
-					$sort:
-						count: -1
-
-				aggregate.push
-					$limit: options?.limit or 20
-
-				aggregated = Logs.aggregate aggregate
-
-			when "users-devices"
-				match.userIdentifier =
-					$exists: true
-					$ne: null
-				match.type =
-					$in: ["connected", "location"]
-
-				aggregate.push
-					$group:
-						_id:
-							user: "$userIdentifier"
-							device: "$device.id"
-						count:
-							$sum: 1
 
 				aggregate.push
 					$sort:
@@ -409,7 +285,7 @@ getAggregatedValues = (appId, view, from, to, options) ->
 					$group:
 						_id: "$_id.user"
 						count:
-							$sum: 1
+							$sum: if view is "users-views" then "$count" else 1
 						devices:
 							$push:
 								id: "$_id.device"
@@ -422,7 +298,7 @@ getAggregatedValues = (appId, view, from, to, options) ->
 				aggregate.push
 					$limit: options?.limit or 20
 
-				aggregated = Logs.aggregate aggregate
+				aggregated = Intervals.aggregate aggregate
 
 			else
 				throw new Meteor.Error "Unknown view: #{view}"
@@ -449,7 +325,7 @@ getAnalyticsValue = (appId, view, from, to, options) ->
 			fields:
 				value: 1
 
-	if cache
+	if cache and false
 		log "Found in cache"
 		cache.value
 	else
@@ -514,15 +390,13 @@ computeAggregatedValue = (appId, view, from, to, options) ->
 
 	match =
 		appId: appId
-		date:
+		interval:
 			$gte: from
 			$lt: to
 
 	uniqueFields = []
 
 	eliminationGroupId = {}
-
-	filteringGroups = []
 
 	aggregate.push
 		$match: match
@@ -535,25 +409,33 @@ computeAggregatedValue = (appId, view, from, to, options) ->
 					$in: ["connected", "location"]
 			else
 				match.type = options.logType
+
 	if options.deviceType
-		match["device.type"] = options.deviceType
+		match.maxDeviceType = options.deviceType
 	if options.browser
-		match["device.browser"] = options.browser
+		match.browser = options.browser
 	if options.browserVersion
-		match["device.browserVersion"] = options.browserVersion
+		match.browserVersion = options.browserVersion
 	if options.os
-		match["device.os"] = options.os
+		match.os = options.os
 	if options.user
 		match.userIdentifier = options.user
 	if options.device
-		match["device.id"] = options.device
+		match.deviceId = options.device
 	if options.session
-		match["device.sessionId"] = options.session
+		match.sessionId = options.session
+
 	if options.locationPattern
 		match.location =
 			$regex: options.locationPattern
-	if options.location
+	else if options.location
 		match.location = options.location
+
+	if options.deviceCount
+		match.deviceTypes =
+			$size: options.deviceCount
+	else if options.deviceTypeCombination
+		match.deviceTypes = options.deviceTypeCombination
 
 	# Unique
 	switch view
@@ -563,135 +445,28 @@ computeAggregatedValue = (appId, view, from, to, options) ->
 		when "users"
 			uniqueFields.push "userIdentifier"
 		when "devices"
-			uniqueFields.push "device.id"
+			uniqueFields.push "deviceId"
 		when "sessions"
-			uniqueFields.push "device.sessionId"
+			uniqueFields.push "sessionId"
 		when "deviceTypes"
-			uniqueFields.push "device.type"
+			uniqueFields.push "maxDeviceType"
 		when "browsers"
-			uniqueFields.push "device.browser"
+			uniqueFields.push "browser"
 		when "browserVersions"
-			uniqueFields.push "device.browser"
-			uniqueFields.push "device.browserVersion"
+			uniqueFields.push "browser"
+			uniqueFields.push "browserVersion"
 		when "oses"
-			uniqueFields.push "device.os"
+			uniqueFields.push "os"
 		when "locations"
 			uniqueFields.push "location"
 
-	# Filters on aggregated data
-	if options.deviceCount
-		if !match["device.id"]
-			match["device.id"] =
-				$exists: true
-				$ne: null
-		if !match.userIdentifier
-			match.userIdentifier =
-				$exists: true
-				$ne: null
-
-		eliminationGroupId.user = "$userIdentifier"
-		eliminationGroupId.device = "$device.id"
-
-		if uniqueFields.length
-			filteringGroups.push
-				$group:
-					_id:
-						user: "$userIdentifier"
-						device: "$device.id"
-					count:
-						$sum: "$count"
-
-		filteringGroups.push
-			$group:
-				_id: "$_id.user"
-				deviceCount:
-					$sum: 1
-				count:
-					$sum: "$count"
-
-		filteringGroups.push
-			$match:
-				deviceCount: options.deviceCount
-
-	if options.coincidentDeviceCount
-		if !match["device.id"]
-			match["device.id"] =
-				$exists: true
-				$ne: null
-		if !match.userIdentifier
-			match.userIdentifier =
-				$exists: true
-				$ne: null
-
-		eliminationGroupId.year =
-			$year: "$date"
-		eliminationGroupId.month =
-			$month: "$date"
-		eliminationGroupId.day =
-			$dayOfMonth: "$date"
-		eliminationGroupId.hour =
-			$hour: "$date"
-		eliminationGroupId.user = "$userIdentifier"
-		eliminationGroupId.device = "$device.id"
-
-		if uniqueFields.length
-			filteringGroups.push
-				$group:
-					_id:
-						year: "$_id.year"
-						month: "$_id.month"
-						day: "$_id.day"
-						hour: "$_id.hour"
-						#minute: "$_id.minute"
-						user: "$_id.user"
-						device: "$_id.device"
-					count:
-						$sum: "$count"
-
-			filteringGroups.push
-				$group:
-					_id:
-						year: "$_id.year"
-						month: "$_id.month"
-						day: "$_id.day"
-						hour: "$_id.hour"
-						#minute: "$_id.minute"
-						user: "$_id.user"
-					deviceCount:
-						$sum: 1
-					count:
-						$sum: "$count"
-
-		else
-
-			filteringGroups.push
-				$group:
-					_id:
-						year: "$_id.year"
-						month: "$_id.month"
-						day: "$_id.day"
-						hour: "$_id.hour"
-						#minute: "$_id.minute"
-						user: "$_id.user"
-					deviceCount:
-						$sum: 1
-					count:
-						$sum: "$countAll"
-
-		filteringGroups.push
-			$match:
-				deviceCount: options.coincidentDeviceCount
-
-
 	if uniqueFields.length
-		id = {}
 		for uniqueField, i in uniqueFields
 			match[uniqueField] =
 				$exists: true
 				$ne: null
 			eliminationGroupId["uniqueField#{i}"] = "$#{uniqueField}"
 
-	if Object.keys(eliminationGroupId).length
 		aggregate.push
 			$group:
 				_id: eliminationGroupId
@@ -700,30 +475,24 @@ computeAggregatedValue = (appId, view, from, to, options) ->
 				countAll:
 					$sum: 1
 
-	if aggregate.length is 1
-		log match
-		value = Logs.find(match).count()
+	# Sum it all together
+	aggregate.push
+		$group:
+			_id: "count"
+			count:
+				$sum: "$count"
+
+	for a in aggregate
+		log a
+
+	aggregated = Intervals.aggregate aggregate
+
+	if aggregated.length
+		value = aggregated[0].count
 	else
-		for step in filteringGroups
-			aggregate.push step
+		value = 0
 
-		# Sum it all together
-		aggregate.push
-			$group:
-				_id: "count"
-				count:
-					$sum: "$count"
-
-		for a in aggregate
-			log a
-
-		aggregated = Logs.aggregate aggregate
-		if aggregated.length
-			value = aggregated[0].count
-		else
-			value = 0
-
-	value
+	log value
 
 ###
 computeValue = (logs, view, options) ->

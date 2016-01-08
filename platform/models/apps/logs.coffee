@@ -41,13 +41,15 @@ Schemas.DeviceState = new SimpleSchema
 		type: String
 
 Schemas.Log = new SimpleSchema
-	userIdentifier:
-		type: String
-		optional: true
 	appId:
 		type: String
 		min: 17
 		max: 17
+	device:
+		type: Schemas.DeviceState
+	userIdentifier:
+		type: String
+		optional: true
 	createdAt:
 		type: Date
 		denyUpdate: true
@@ -81,8 +83,6 @@ Schemas.Log = new SimpleSchema
 		type: String
 		max: 300
 		optional: true
-	device:
-		type: Schemas.DeviceState
 	connectedDevices:
 		type: [String]
 
@@ -91,16 +91,3 @@ Logs.attachSchema Schemas.Log
 Logs.helpers
 	deviceDiam: ->
 		Math.sqrt @device.width*@device.width + @device.height*@device.height
-	deviceType: ->
-		if @device.pixelRatio
-			realDiam = @deviceDiam() / @device.pixelRatio
-		else
-			realDiam = @deviceDiam()
-		if realDiam > 1800
-			"xl"
-		else if realDiam > 1150
-			"lg"
-		else if realDiam > 500
-			"md"
-		else
-			"sm"

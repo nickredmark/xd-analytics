@@ -2,16 +2,16 @@ Templates.Loading = React.createClass
 	render: ->
 		<div className="row">
 			<div className="col-xs-12">
-				<Templates.Spinner/>
+				<div className="text-center">
+					<Templates.Spinner/>
+				</div>
 			</div>
 		</div>
 
 
 Templates.Spinner = React.createClass
 	render: ->
-		<div className="text-center">
-			<i className="fa fa-spinner fa-pulse fa-lg"></i>
-		</div>
+		<i className="fa fa-spinner fa-pulse fa-lg"></i>
 
 Templates.Ellipsis = React.createClass
 	render: ->

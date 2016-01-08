@@ -41,11 +41,15 @@ Views.Timeline = React.createClass
 		day: "Day"
 		week: "Week"
 		month: "Month"
-		global: "Global"
 	logTypes:
 		view: "View"
+		connected: "Connected"
+		location: "Location"
 		login: "Log in"
 		logout: "Log out"
+		update: "Update"
+		online: "Online"
+		"user-detected": "User detected"
 	browserViews:
 		views: "By views"
 		devices: "By devices"
@@ -53,13 +57,11 @@ Views.Timeline = React.createClass
 	userViews:
 		views: "By views"
 		devices: "By devices"
-	deviceCombinationsViews:
-		coincident: "Coincident"
-		overall: "Overall"
 	timeline: null
 	chart: null
 	currentChart: null
 	labels: []
+	deviceTypes: ["sm", "md", "lg", "xl"]
 
 	getInitialState: ->
 		from: moment().startOf('day').subtract(7, 'days').toDate()
@@ -73,6 +75,7 @@ Views.Timeline = React.createClass
 		users: null
 		deviceCombinations: null
 		deviceTypes: null
+		deviceTypeCombinations: null
 		pattern: ""
 		patterns: []
 
@@ -83,15 +86,22 @@ Views.Timeline = React.createClass
 		views:
 			users: "views"
 			browsers: "views"
-			deviceCombinations: "coincident"
 
 		filters:
 			logType: "view"
 
 	addDataset: ->
 		label = @views[@state.view]
-		parts = for key, value of @state.filters
-			"#{key}: #{value}"
+		parts = []
+		for key, value of @state.filters
+			switch key
+				when "deviceType"
+					value = @deviceTypes[value-1]
+				when "deviceTypeCombination"
+					combination = for type in value
+						@deviceTypes[type-1]
+					value = combination.join("-")
+			parts.push "#{key}: #{value}"
 		if parts.length
 			label += " (#{parts.join(", ")})"
 		options = {}
@@ -141,8 +151,9 @@ Views.Timeline = React.createClass
 	loadAllValues: ->
 		log "Load all values"
 		@loadAllDatasets()
+		@loadValues "deviceCombinations", "device-combinations"
 		@loadValues "deviceTypes", "device-types"
-		@loadValues "deviceCombinations", "deviceCombinations-#{@state.views.deviceCombinations}"
+		@loadValues "deviceTypeCombinations", "device-type-combinations"
 		@loadValues "browsers", "browsers-#{@state.views.users}"
 		@loadValues "oses"
 		@loadValues "locations"
@@ -188,61 +199,6 @@ Views.Timeline = React.createClass
 		@setState
 			patterns: patterns
 			pattern: ""
-	loadPattern: (pattern) ->
-		@setValueSet "Location pattern: #{pattern}",
-			type: "pattern"
-			pattern: pattern
-	loadBrowser: (browser) ->
-		@setValueSet "Browser: #{browser}",
-			type: "browser"
-			browser: browser
-	loadBrowserVersion: (browser, version) ->
-		label = "Browser: #{browser} #{version}"
-		@setValueSet label,
-			type: "browser-version"
-			browser: browser
-			version: version
-	loadOS: (os) ->
-		label = "OS: #{os}"
-		@setValueSet label,
-			type: "os"
-			os: os
-	loadDeviceCount: (type, deviceCount) ->
-		if type is "overall"
-			type = "device-count-overall"
-			if deviceCount is 1
-				label = "1 device overall"
-			else
-				label = "#{deviceCount} devices overall"
-		else
-			type = "device-count-coincident"
-			if deviceCount is 1
-				label = "1 device"
-			else
-				label = "#{deviceCount} devices"
-		@setValueSet label,
-			type: type
-			deviceCount: deviceCount
-	loadDeviceType: (deviceType) ->
-		label = "#{deviceType} devices"
-		@setValueSet label,
-			type: "device-type"
-			deviceType: deviceType
-	loadUser: (user) ->
-		label = "User: #{user}"
-		@setValueSet label,
-			type: "user"
-			user: user
-	loadDevice: (device) ->
-		label = "Device: #{device}"
-		@setValueSet label,
-			type: "device"
-			device: device
-	loadLocation: (location) ->
-		label = "Location: #{location}"
-		@setValueSet label,
-			type: "location"
-			location: location
 	refresh: ->
 		@loadAllDatasets()
 	pieChart: (buckets) ->
@@ -334,10 +290,20 @@ Views.Timeline = React.createClass
 			labels: labels
 			datasets: datasets
 		,
-			multiTooltipTemplate: "<%= datasetLabel %> - <%= value %>"
+			multiTooltipTemplate: (valuesObject) ->
+				"#{cut(valuesObject.datasetLabel, 30)} - #{valuesObject.value}"
 			bezierCurve: false
 	clearCache: ->
 		Meteor.call 'clearCache', @props.appId, handleResult "Cache cleared"
+	setBrowser: (browser) ->
+		filters = @state.filters
+		if filters.browser is browser
+			delete(filters.browser)
+		else
+			filters.browser = browser
+		delete(filters.browserVersion)
+		@setState
+			filters: filters
 	setBrowserVersion: (browser, browserVersion)->
 		filters = @state.filters
 		if filters.browser is browser and filters.browserVersion is browserVersion
@@ -346,7 +312,7 @@ Views.Timeline = React.createClass
 			filters.browser = browser
 			filters.browserVersion = browserVersion
 		@setState
-			filter: filters
+			filters: filters
 	render: ->
 		<div>
 			<div>
@@ -372,7 +338,7 @@ Views.Timeline = React.createClass
 			<div>
 				<div className="col-xs-12 col-sm-9">
 					<div id="timeline-wrapper">
-						<canvas id="timeline" height="50"></canvas>
+						<canvas id="timeline" height="80"></canvas>
 					</div>
 				</div>
 				<div className="col-xs-12 col-sm-3">
@@ -383,9 +349,16 @@ Views.Timeline = React.createClass
 								{
 									for label, data of @state.values
 										<li key={label}>
-											<a style={{color: data.color[0]}} title={label}>
+											{
+												if !data.values
+													<span>
+														<Templates.Spinner/>
+														&nbsp;
+													</span>
+											}
+											<span style={{color: data.color[0]}} title={label}>
 												{label}
-											</a>
+											</span>
 											&nbsp;
 											<button className="btn btn-danger btn-xs" onClick={@wrap(@deleteValue,label)}>
 												<i className="fa fa-remove"></i>
@@ -396,14 +369,14 @@ Views.Timeline = React.createClass
 						else
 							<p>No data selected.</p>
 					}
+					<button onClick={@addDataset} className="btn btn-primary">
+						Add current selection
+					</button>
 				</div>
 			</div>
 			<div>
 				<div className="col-xs-12">
-					<h3>Select data</h3>
-					<button onClick={@addDataset} className="btn btn-primary pull-right">
-						Add
-					</button>
+					<h3>Select</h3>
 					<div className="labels">
 						{
 							for name, label of @views
@@ -414,7 +387,7 @@ Views.Timeline = React.createClass
 			</div>
 			<div>
 				<div className="col-xs-12">
-					<h3>Filter data</h3>
+					<h3>Filter</h3>
 				</div>
 			</div>
 			<div>
@@ -428,7 +401,10 @@ Views.Timeline = React.createClass
 								</li>
 						}
 					</ul>
-					<h4>Device types</h4>
+				</div>
+				<div className="col-xs-12 col-sm-3 col-lg-2">
+					<h3>Devices</h3>
+					<h4>Types</h4>
 					{
 						if @state.deviceTypes
 							<ul className="activables">
@@ -436,7 +412,7 @@ Views.Timeline = React.createClass
 									for deviceType, i in @state.deviceTypes
 										<li key={i}>
 											<a onClick={@toggleDictValue("filters", "deviceType", deviceType._id)} className={if @state.filters.deviceType is deviceType._id then "active"}>
-												{deviceType._id or "undefined"} ({deviceType.count})
+												{@deviceTypes[deviceType._id-1] or "undefined"} ({deviceType.count} devices)
 											</a>
 										</li>
 								}
@@ -444,28 +420,41 @@ Views.Timeline = React.createClass
 						else
 							<Templates.Loading/>
 					}
-					<h4>Number of devices</h4>
-					<div className="labels">
-						{
-							for name, label of @deviceCombinationsViews
-								<label key={name} onClick={@wrap(@setView, 'deviceCombinations', name)} className={if @state.views.deviceCombinations is name then "active"}>{label}</label>
-						}
-					</div>
+					<h4>Amount</h4>
 					{
 						if @state.deviceCombinations
 							<ul className="activables">
 								{
 									for deviceCount, i in @state.deviceCombinations
 										active = false
-										if @state.views.deviceCombinations is "overall"
-											field = "deviceCount"
-										else
-											field = "coincidentDeviceCount"
-										if @state.filters[field] is deviceCount._id
+										if @state.filters.deviceCount is deviceCount._id
 											active = true
 										<li key={i} >
-											<a onClick={@toggleDictValue("filters", field, deviceCount._id)} className={if active then "active"}>
-												{deviceCount._id or "undefined"} ({deviceCount.count})
+											<a onClick={@toggleDictValue("filters", "deviceCount", deviceCount._id)} className={if active then "active"}>
+												{deviceCount._id or "undefined"} ({deviceCount.count} users)
+											</a>
+										</li>
+								}
+							</ul>
+						else
+							<Templates.Loading/>
+					}
+					<h4>Combinations</h4>
+					{
+						if @state.deviceTypeCombinations
+							if @state.filters.deviceTypeCombination
+								activeCombination = for type in @state.filters.deviceTypeCombination
+									@deviceTypes[type-1]
+								activeLabel = activeCombination.join(", ")
+							<ul className="activables">
+								{
+									for deviceTypeCombination, i in @state.deviceTypeCombinations
+										combination = for type in deviceTypeCombination._id
+											@deviceTypes[type-1]
+										label = combination.join(", ")
+										<li key={i}>
+											<a className={if label is activeLabel then "active"} onClick={@toggleDictValue("filters", "deviceTypeCombination", deviceTypeCombination._id)}>
+												{label or "undefined"} ({deviceTypeCombination.count} users)
 											</a>
 										</li>
 								}
@@ -489,7 +478,7 @@ Views.Timeline = React.createClass
 									for browser, i in @state.browsers
 										<li key={i} >
 											<Templates.Dropdown>
-												<a onClick={@toggleDictValue("filters", "browser", browser._id)} className={if @state.filters.browser is browser._id then "active"}>
+												<a onClick={@wrap(@setBrowser,browser._id)} className={if @state.filters.browser is browser._id then "active"}>
 													{browser._id or "undefined"} ({browser.count})
 												</a>
 												<ul>
@@ -518,7 +507,7 @@ Views.Timeline = React.createClass
 									for os, i in @state.oses
 										<li key={i} >
 											<a onClick={@toggleDictValue("filters", "os", os._id)} className={if @state.filters.os is os._id then "active"}>
-												{os._id or "undefined"} ({os.count})
+												{os._id or "undefined"} ({os.count} devices)
 											</a>
 										</li>
 								}
@@ -554,9 +543,10 @@ Views.Timeline = React.createClass
 							<ul className="activables">
 								{
 									for location, i in @state.locations
+										active = @state.filters.location is location._id
 										<li key={i}>
-											<a onClick={@toggleDictValue("filters", "location", location._id)} className={if @state.filters.location is location._id then "active"} title={location._id}>
-												{cut(location._id,25)} ({location.count})
+											<a onClick={@toggleDictValue("filters", "location", location._id)} className={if  active then "active"} title={location._id}>
+												{if active then location._id else cut(location._id,25)} ({location.count} views)
 											</a>
 										</li>
 								}
@@ -578,18 +568,20 @@ Views.Timeline = React.createClass
 							<ul className="activables">
 								{
 									for user, i in @state.users
+										active = @state.filters.user is user._id
 										<li key={user._id}>
 											<Templates.Dropdown>
-												<a onClick={@toggleDictValue("filters", "user", user._id)} className={if @state.filters.user is user._id then "active"} title={user._id}>
-													{cut(user._id,20) or "undefined"} ({user.count})
+												<a onClick={@toggleDictValue("filters", "user", user._id)} className={if active then "active"} title={user._id}>
+													{if active then user._id else cut(user._id,20) or "undefined"} ({user.count})
 												</a>
 
 												<ul className="activables">
 													{
 														for device, j in user.devices
+															active = @state.filters.device is device.id
 															<li key={j}>
-																<a onClick={@toggleDictValue("filters", "device", device.id)} className={if @state.filters.device is device.id then "active"} title={device.id}>
-																	{cut(device.id,20) or "undefined"} ({device.count})
+																<a onClick={@toggleDictValue("filters", "device", device.id)} className={if active then "active"} title={device.id}>
+																	{if active then device.id else cut(device.id,20) or "undefined"} ({device.count} views)
 																</a>
 															</li>
 													}
@@ -647,18 +639,3 @@ cut = (string, length) ->
 		string
 	else
 		"#{string[0...length/2]}...#{string[-length/2..]}"
-
-Templates.DataView = React.createClass
-	render: ->
-		label = @props.label
-		data = @props.data
-		<Templates.Dropdown>
-			<a style={{color: data.color[0]}} title={label}>
-				{cut(label, 30)}
-			</a>
-			<div>
-				<button className="btn btn-danger btn-xs" onClick={@props.onRemove}>
-					Remove
-				</button>
-			</div>
-		</Templates.Dropdown>

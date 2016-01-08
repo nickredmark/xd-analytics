@@ -24,21 +24,21 @@ Templates.App = React.createClass
 			{
 				if @data.ready
 					if @data.app
-						<div className="row">
+						<div>
 							<div className="col-xs-12">
 								<h1>{@data.app.name}</h1>
 								<p>{@data.app.description}</p>
 							</div>
 						</div>
 					else
-						<div className="row">
+						<div>
 							<div className="col-xs-12">
 								<h1>Not found</h1>
 								<p>This app doesn't exist. <a href="/apps">Back to your apps</a>.</p>
 							</div>
 						</div>
 				else
-					<div className="row">
+					<div>
 						<div className="col-xs-12">
 							<h1>Loading App<Templates.Ellipsis/></h1>
 						</div>
@@ -46,7 +46,7 @@ Templates.App = React.createClass
 			}
 			{
 				if not @data.ready or @data.app
-					<div className="row">
+					<div>
 						<div className="col-xs-12">
 							<ul className="nav nav-tabs">
 								{
@@ -121,7 +121,7 @@ Views.Logs = React.createClass
 												<span>No storage</span>
 										}
 									</td>
-									<td>{l.device.os}, {l.device.browser}, {l.device.browserVersion}, {l.deviceType()} ({l.device.width}x{l.device.height}, {l.device.pixelRatio}) </td>
+									<td>{l.device.os}, {l.device.browser}, {l.device.browserVersion}, {l.device.type} ({l.device.width}x{l.device.height}, {l.device.pixelRatio}) </td>
 									<td>{l.userIdentifier}</td>
 									<td>{l.location}</td>
 									<td>{l.type}</td>
