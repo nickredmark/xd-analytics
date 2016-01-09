@@ -121,9 +121,9 @@ intervalIdString = (interval) ->
 				log i
 			i++
 
-Meteor.computeIntervals = (min) ->
+Meteor.computeInitialItervals = (min) ->
 
-	InitialIntervals.remove({})
+	InitialIntervals.remove()
 
 	start = moment()
 	if !min
@@ -188,6 +188,7 @@ Meteor.computeIntervals = (min) ->
 			,
 				minDate: @date
 				maxDate: @date
+				timeOnline: 10*1000
 				minWidth: @device.width
 				maxWidth: @device.width
 				minHeight: @device.height
@@ -199,6 +200,8 @@ Meteor.computeIntervals = (min) ->
 				maxDeviceType: deviceType diam
 				count: 1
 		, (key, values) ->
+			minDate = new Date(100000000000000) # if you are running this code in the year 5138, sorry ;)
+			maxDate = new Date(0)
 			minWidth = Number.MAX_VALUE
 			maxWidth = 0
 			minHeight = Number.MAX_VALUE
@@ -209,6 +212,8 @@ Meteor.computeIntervals = (min) ->
 			maxDeviceType = 0
 			pixelRatio = 0
 			for value in values
+				minDate = Math.min(minDate, value.minDate)
+				maxDate = Math.max(maxDate, value.maxDate)
 				minWidth = Math.min(minWidth, value.minWidth)
 				maxWidth = Math.max(maxWidth, value.maxWidth)
 				minHeight = Math.min(minHeight, value.minHeight)
@@ -219,6 +224,12 @@ Meteor.computeIntervals = (min) ->
 				maxDeviceType = Math.max(maxDeviceType, value.maxDeviceType)
 				pixelRatio = if value.pixelRatio then value.pixelRatio
 
+			minDate = new Date(minDate)
+			maxDate = new Date(maxDate)
+
+			minDate: minDate
+			maxDate: maxDate
+			timeOnline: maxDate - minDate + 10*1000
 			minWidth: minWidth
 			maxWidth: maxWidth
 			minHeight: minHeight
@@ -257,11 +268,18 @@ Meteor.computeDeviceIntervals = (min) ->
 			maxDeviceType: @value.maxDeviceType
 			events: [@]
 			logs: @value.count
+			deviceMinDate: @value.minDate
+			deviceMaxDate: @value.maxDate
+			deviceTimeOnline: @value.timeOnline
 	, (key, values) ->
+		deviceMinDate = new Date(100000000000000)
+		deviceMaxDate = new Date(0)
 		maxDeviceType = 0
 		events = []
 		logs = 0
 		for value in values
+			deviceMinDate = Math.min(deviceMinDate, value.deviceMinDate)
+			deviceMaxDate = Math.max(deviceMaxDate, value.deviceMaxDate)
 			maxDeviceType = Math.max(maxDeviceType, value.maxDeviceType)
 
 			for event in value.events
@@ -269,6 +287,12 @@ Meteor.computeDeviceIntervals = (min) ->
 
 			logs += value.logs
 
+		deviceMinDate = new Date(deviceMinDate)
+		deviceMaxDate = new Date(deviceMaxDate)
+
+		deviceMinDate: deviceMinDate
+		deviceMaxDate: deviceMaxDate
+		deviceTimeOnline: deviceMaxDate - deviceMinDate + 10*1000
 		maxDeviceType: maxDeviceType
 		events: events
 		logs: logs
@@ -288,14 +312,22 @@ Meteor.computeUserIntervals = (min) ->
 			interval: @_id.interval
 			userIdentifier: @_id.userIdentifier
 		,
+			userMinDate: @value.deviceMinDate
+			userMaxDate: @value.deviceMaxDate
+			userTimeOnline: @value.deviceTimeOnline
 			deviceTypes: [@value.maxDeviceType]
-			events: @value.events
+			deviceCount: 1
+			events: [@]
 			logs: @value.count
 	, (key, values) ->
+		userMinDate = new Date(100000000000000)
+		userMaxDate = new Date(0)
 		events = []
 		deviceTypes = []
 		logs = 0
 		for value in values
+			userMinDate = Math.min(userMinDate, value.userMinDate)
+			userMaxDate = Math.max(userMaxDate, value.userMaxDate)
 
 			for event in value.events
 				events.push event
@@ -305,7 +337,14 @@ Meteor.computeUserIntervals = (min) ->
 
 			logs += value.logs
 
+		userMinDate = new Date(userMinDate)
+		userMaxDate = new Date(userMaxDate)
+
+		userMinDate: userMinDate
+		userMaxDate: userMaxDate
+		userTimeOnline: userMaxDate - userMinDate + 10*1000
 		deviceTypes: deviceTypes.sort()
+		deviceCount: deviceTypes.length
 		events: events
 		logs: logs
 	,
@@ -316,32 +355,47 @@ Meteor.computeFinalIntervals = ->
 	UserIntervals.aggregate [
 		$unwind: "$value.events"
 	,
+		$unwind: "$value.events.value.events"
+	,
 		$project:
 			_id: false
 			appId: "$_id.appId"
 			userIdentifier: "$_id.userIdentifier"
-			interval: "$value.events._id.interval"
+			interval: "$_id.interval"
+
 			deviceId: "$value.events._id.deviceId"
-			sessionId: "$value.events._id.sessionId"
-			type: "$value.events._id.type"
-			location: "$value.events._id.location"
-			browser: "$value.events._id.browser"
-			browserVersion: "$value.events._id.browserVersion"
-			os: "$value.events._id.os"
+
+			sessionId: "$value.events.value.events._id.sessionId"
+			type: "$value.events.value.events._id.type"
+			location: "$value.events.value.events._id.location"
+			browser: "$value.events.value.events._id.browser"
+			browserVersion: "$value.events.value.events._id.browserVersion"
+			os: "$value.events.value.events._id.os"
+
 			logs: "$value.logs"
+			userMinDate: "$value.userMinDate"
+			userMaxDate: "$value.userMaxDate"
+			userTimeOnline: "$value.userTimeOnline"
 			deviceTypes: "$value.deviceTypes"
-			minDate: "$value.events.value.minDate"
-			maxDate: "$value.events.value.maxDate"
-			minWidth: "$value.events.value.minWidth"
-			maxWidth: "$value.events.value.maxWidth"
-			minHeight: "$value.events.value.minHeight"
-			maxHeight: "$value.events.value.maxHeight"
-			pixelRatio: "$value.events.value.pixelRatio"
-			minDiam: "$value.events.value.minDiam"
-			maxDiam: "$value.events.value.maxDiam"
-			minDeviceType: "$value.events.value.minDeviceType"
-			maxDeviceType: "$value.events.value.maxDeviceType"
-			count: "$value.events.value.count"
+			deviceCount: "$value.deviceCount"
+
+			deviceMinDate: "$value.events.value.deviceMinDate"
+			deviceMaxDate: "$value.events.value.deviceMaxDate"
+			deviceTimeOnline: "$value.events.value.deviceTimeOnline"
+
+			minDate: "$value.events.value.events.value.minDate"
+			maxDate: "$value.events.value.events.value.maxDate"
+			timeOnline: "$value.events.value.events.value.timeOnline"
+			minWidth: "$value.events.value.events.value.minWidth"
+			maxWidth: "$value.events.value.events.value.maxWidth"
+			minHeight: "$value.events.value.events.value.minHeight"
+			maxHeight: "$value.events.value.events.value.maxHeight"
+			pixelRatio: "$value.events.value.events.value.pixelRatio"
+			minDiam: "$value.events.value.events.value.minDiam"
+			maxDiam: "$value.events.value.events.value.maxDiam"
+			minDeviceType: "$value.events.value.events.value.minDeviceType"
+			maxDeviceType: "$value.events.value.events.value.maxDeviceType"
+			count: "$value.events.value.events.value.count"
 	,
 		$out: "finalintervals"
 	]

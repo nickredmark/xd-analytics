@@ -59,13 +59,6 @@ getAggregatedValues = (appId, view, from, to, options) ->
 								version: "$_id.version"
 								count: "$count"
 
-				aggregate.push
-					$sort:
-						count: -1
-
-				aggregate.push
-					$limit: options?.limit or 20
-
 			when "browsers-views"
 
 				match.type =
@@ -92,13 +85,6 @@ getAggregatedValues = (appId, view, from, to, options) ->
 							$push:
 								version: "$_id.version"
 								count: "$count"
-
-				aggregate.push
-					$sort:
-						count: -1
-
-				aggregate.push
-					$limit: options?.limit or 20
 
 			when "browsers-versions"
 				aggregate.push
@@ -130,13 +116,6 @@ getAggregatedValues = (appId, view, from, to, options) ->
 								version: "$_id.version"
 								count: "$count"
 
-				aggregate.push
-					$sort:
-						count: -1
-
-				aggregate.push
-					$limit: options?.limit or 20
-
 			when "oses"
 
 				aggregate.push
@@ -151,14 +130,7 @@ getAggregatedValues = (appId, view, from, to, options) ->
 						count:
 							$sum: 1
 
-				aggregate.push
-					$sort:
-						count: -1
-
-				aggregate.push
-					$limit: options?.limit or 20
-
-			when "device-types"
+			when "deviceTypes"
 				match.deviceId =
 					$exists: true
 					$ne: null
@@ -178,11 +150,7 @@ getAggregatedValues = (appId, view, from, to, options) ->
 						count:
 							$sum: 1
 
-				aggregate.push
-					$sort:
-						count: -1
-
-			when "device-type-combinations"
+			when "deviceTypeCombinations"
 				match.userIdentifier =
 					$exists: true
 					$ne: null
@@ -199,32 +167,32 @@ getAggregatedValues = (appId, view, from, to, options) ->
 						count:
 							$sum: 1
 
-				aggregate.push
-					$sort:
-						count: -1
-
-
-			when "device-combinations"
+			when "deviceCombinations-users", "deviceCombinations-views"
 				match.userIdentifier =
 					$exists: true
 					$ne: null
+				if view is "deviceCombinations-views"
+					match.type =
+						$in: ["connected", "location"]
 
-				aggregate.push
-					$group:
-						_id:
-							user: "$userIdentifier"
-							devices:
-								$size: "$deviceTypes"
+					aggregate.push
+						$group:
+							_id: "$deviceCount"
+							count:
+								$sum: "$count"
+				else
 
-				aggregate.push
-					$group:
-						_id: "$_id.devices"
-						count:
-							$sum: 1
+					aggregate.push
+						$group:
+							_id:
+								user: "$userIdentifier"
+								deviceCount: "$deviceCount"
 
-				aggregate.push
-					$sort:
-						count: -1
+					aggregate.push
+						$group:
+							_id: "$_id.deviceCount"
+							count:
+								$sum: 1
 
 			when "locations-views", "locations-combinedViews"
 				match.location =
@@ -239,9 +207,8 @@ getAggregatedValues = (appId, view, from, to, options) ->
 					match.deviceId =
 						$exists: true
 						$ne: null
-					match["deviceTypes.1"] =
-						$exists: true
-
+					match.deviceCount =
+						$gte: 2
 
 				aggregate.push
 					$group:
@@ -249,60 +216,100 @@ getAggregatedValues = (appId, view, from, to, options) ->
 						count:
 							$sum: "$count"
 
-				aggregate.push
-					$sort:
-						count: -1
 
-				aggregate.push
-					$limit: options?.limit or 20
-
-
-			when "users-views", "users-devices", "users-combinedViews"
+			when "users-timeOnline", "users-combinedTimeOnline"
 				match.userIdentifier =
 					$exists: true
 					$ne: null
-				if view is "users-combinedViews"
-					# make sure at least 2 devices have been used at the same time
-					match.deviceId =
-						$exists: true
-						$ne: null
-					match["deviceTypes.1"] =
-						$exists: true
-				match.type =
-					$in: ["connected", "location"]
+
+				switch view
+					when "users-combinedTimeOnline"
+						match.deviceId =
+							$exists: true
+							$ne: null
+						match.deviceCount =
+							$gte: 2
 
 				aggregate.push
 					$group:
 						_id:
-							user: "$userIdentifier"
-							device: "$deviceId"
-						count:
-							$sum: "$count"
-
-				aggregate.push
-					$sort:
-						count: -1
+							userIdentifier: "$userIdentifier"
+							interval: "$interval"
+						userTimeOnline:
+							$first: "$userTimeOnline"
 
 				aggregate.push
 					$group:
-						_id: "$_id.user"
+						_id: "$_id.userIdentifier"
 						count:
-							$sum: if view is "users-devices" then 1 else "$count"
-						devices:
-							$push:
-								id: "$_id.device"
-								count: "$count"
+							$sum: "$userTimeOnline"
+
+			when "users-views", "users-devices", "users-combinedViews", "users-combinedDevices"
+				match.userIdentifier =
+					$exists: true
+					$ne: null
+
+				switch view
+					when "users-combinedViews", "users-combinedDevices"
+						# make sure at least 2 devices have been used at the same time
+						match.deviceId =
+							$exists: true
+							$ne: null
+						match.deviceCount =
+							$gte: 2
+					when "users-views", "users-devices"
+						match.type =
+							$in: ["connected", "location"]
+
+				group =
+					_id:
+						userIdentifier: "$userIdentifier"
+						deviceId: "$deviceId"
+
+				switch view
+					when "users-combinedDevices"
+						group.count =
+							$max: "$deviceCount"
+					else
+						group.count =
+							$sum: "$count"
+
+				aggregate.push
+					$group: group
 
 				aggregate.push
 					$sort:
 						count: -1
 
+				switch view
+					when "users-devices"
+						count =
+							$sum: 1
+					when "users-combinedDevices"
+						count =
+							$max: "$count"
+					else
+						count =
+							$sum: "$count"
+
 				aggregate.push
-					$limit: options?.limit or 20
+					$group:
+						_id: "$_id.userIdentifier"
+						count: count
+						devices:
+							$push:
+								id: "$_id.deviceId"
+								count: "$count"
 
 			else
 				throw new Meteor.Error "Unknown view: #{view}"
 
+		aggregate.push
+			$sort:
+				count: -1
+
+		aggregate.push
+			$limit: options?.limit or 20
 
 		for a in aggregate
 			log a
@@ -338,48 +345,6 @@ getAnalyticsValue = (appId, view, from, to, options) ->
 
 		value = computeAggregatedValue appId, view, from, to, options
 
-		###
-		if view in aggregate
-		else
-			preprocessLogs appId, from, to
-
-			[labels, buckets] = getBuckets from, to
-
-
-			logs = Logs.find
-					appId: appId
-					date:
-						$gte: from
-						$lt: to
-				,
-					sort:
-						date: 1
-
-			if reducible[view] && logs.count() > 100 && labels.length > 1
-					value = {}
-					for label, i in labels
-
-						if buckets[i] > moment()
-							break
-
-						map = getAnalyticsValue appId, view, buckets[i].toDate(), moment(buckets[i+1]).subtract(1, "ms").toDate(), options
-						for key, v of map
-							if not value[key]
-								value[key] = 0
-							value[key] += parseFloat(v)
-
-			else
-			logs = Logs.find
-					appId: appId
-					date:
-						$gte: from
-						$lt: to
-				,
-					sort:
-						date: 1
-			value = computeValue logs, view, options
-			###
-
 		if to < moment()
 			Cache.insert
 				appId: appId
@@ -399,10 +364,6 @@ computeAggregatedValue = (appId, view, from, to, options) ->
 		interval:
 			$gte: from
 			$lt: to
-
-	uniqueFields = []
-
-	eliminationGroupId = {}
 
 	aggregate.push
 		$match: match
@@ -446,8 +407,7 @@ computeAggregatedValue = (appId, view, from, to, options) ->
 			match.deviceId =
 				$exists: true
 				$ne: null
-		match.deviceTypes =
-			$size: options.deviceCount
+		match.deviceCount = options.deviceCount
 	else if options.deviceTypeCombination
 		if !match.userIdentifier
 			match.userIdentifier =
@@ -459,50 +419,85 @@ computeAggregatedValue = (appId, view, from, to, options) ->
 				$ne: null
 		match.deviceTypes = options.deviceTypeCombination
 
-	# Unique
-	switch view
-		when "logs"
-			# Do nothing
-			null
-		when "users"
-			uniqueFields.push "userIdentifier"
-		when "devices"
-			uniqueFields.push "deviceId"
-		when "sessions"
-			uniqueFields.push "sessionId"
-		when "deviceTypes"
-			uniqueFields.push "maxDeviceType"
-		when "browsers"
-			uniqueFields.push "browser"
-		when "browserVersions"
-			uniqueFields.push "browser"
-			uniqueFields.push "browserVersion"
-		when "oses"
-			uniqueFields.push "os"
-		when "locations"
-			uniqueFields.push "location"
 
-	if uniqueFields.length
+	if view isnt "logs"
+		uniqueFields = []
+		group =
+			_id: {}
+
+		# Unique
+		switch view
+			when "users"
+				uniqueFields.push "userIdentifier"
+			when "devices"
+				uniqueFields.push "deviceId"
+			when "sessions"
+				uniqueFields.push "sessionId"
+			when "deviceTypes"
+				uniqueFields.push "maxDeviceType"
+			when "browsers"
+				uniqueFields.push "browser"
+			when "browserVersions"
+				uniqueFields.push "browser"
+				uniqueFields.push "browserVersion"
+			when "oses"
+				uniqueFields.push "os"
+			when "locations"
+				uniqueFields.push "location"
+			when "timeOnline", "averageTimeOnline"
+				if options.device or options.deviceType
+					uniqueFields.push "deviceId"
+					uniqueFields.push "interval"
+					group.timeOnline =
+						$first: "$deviceTimeOnline"
+				else
+					uniqueFields.push "userIdentifier"
+					uniqueFields.push "interval"
+					group.timeOnline =
+						$first: "$userTimeOnline"
+
 		for uniqueField, i in uniqueFields
-			match[uniqueField] =
-				$exists: true
-				$ne: null
-			eliminationGroupId["uniqueField#{i}"] = "$#{uniqueField}"
+			if !match[uniqueField]
+				match[uniqueField] =
+					$exists: true
+					$ne: null
+			group._id[uniqueField] = "$#{uniqueField}"
 
 		aggregate.push
-			$group:
-				_id: eliminationGroupId
-				count:
-					$first: 1
-				countAll:
-					$sum: 1
+			$group: group
+
+		switch view
+			when "averageTimeOnline"
+				group =
+					_id: {}
+					timeOnline:
+						$sum: "$timeOnline"
+				if options.device or options.deviceType
+					group._id.deviceId = "$_id.deviceId"
+				else
+					group._id.userIdentifier = "$_id.userIdentifier"
+				aggregate.push
+					$group: group
+
+	group =
+		_id: "count"
+	switch view
+		when "logs"
+			group.count =
+				$sum: "$count"
+		when "timeOnline"
+			group.count =
+				$sum: "$timeOnline"
+		when "averageTimeOnline"
+			group.count =
+				$avg: "$timeOnline"
+		else
+			group.count =
+				$sum: 1
 
 	# Sum it all together
 	aggregate.push
-		$group:
-			_id: "count"
-			count:
-				$sum: "$count"
+		$group: group
 
 	for a in aggregate
 		log a
@@ -514,156 +509,11 @@ computeAggregatedValue = (appId, view, from, to, options) ->
 	else
 		value = 0
 
-	log value
-
-###
-computeValue = (logs, view, options) ->
-
-	transform = (map) ->
-		map
-
-	reduce = (value) ->
-		value
-
 	switch view
+		when "timeOnline", "averageTimeOnline"
+			value /= 1000*60
 
-		when "global-timeOnline"
-			assign = (map, element) ->
-				if not map["Time online"]
-					map["Time online"] = {}
-				if not map["Time online"][element.device.id]
-					map["Time online"][element.device.id] = [
-						start: moment(element.date)
-						end: moment(element.date)
-					]
-				else
-					current = moment(element.date)
-					history = map["Time online"][element.device.id]
-					timeout = moment(history[history.length-1].end).add(5, 'minutes')
-					if current < timeout
-						history[history.length-1].end = current
-			transform = (map) ->
-				time = 0
-				for device, history of map["Time online"]
-					for interval in history
-						time += interval.end.add(10, 'seconds').diff(interval.start, 'minutes', true)
-				"Time online": time.toFixed(2)
-
-		when "global-timeOnlineByDeviceType"
-			assign = (map, element) ->
-				if not map[element.device.id]
-					map[element.device.id] =
-						type: {}
-						history: [
-							start: moment(element.date)
-							end: moment(element.date)
-						]
-				else
-					current = moment(element.date)
-					history = map[element.device.id].history
-					timeout = moment(history[history.length-1].end).add(5, 'minutes')
-					if current < timeout
-						history[history.length-1].end = current
-				map[element.device.id].type[element.deviceType()] = 1
-			transform = (map) ->
-				byDeviceType = {}
-
-				for device, data of map
-					time = 0
-					for interval in data.history
-						time += interval.end.add(10, 'seconds').diff(interval.start, 'minutes', true)
-					byDeviceType[Object.keys(data.type).sort().join()] = time
-
-				byDeviceType
-
-		when "global-averageTimeOnline"
-			assign = (map, element) ->
-				if not map["Time online"]
-					map["Time online"] = {}
-				if not map["Time online"][element.device.id]
-					map["Time online"][element.device.id] = [
-						start: moment(element.date)
-						end: moment(element.date)
-					]
-				else
-					current = moment(element.date)
-					history = map["Time online"][element.device.id]
-					timeout = moment(history[history.length-1].end).add(5, 'minutes')
-					if current < timeout
-						history[history.length-1].end = current
-			transform = (map) ->
-				if map["Time online"]
-					time = 0
-					for device, history of map["Time online"]
-						for interval in history
-							time += interval.end.add(10, 'seconds').diff(interval.start, 'minutes', true)
-					nmap =
-						"Time online": (time / Object.keys(map["Time online"]).length).toFixed(2)
-				else
-					nmap =
-						"Time online": 0
-				nmap
-
-		when "global-deviceTypes"
-			deviceTypes = {}
-			logs.forEach (l) ->
-				if not deviceTypes[l.device.id]
-					deviceTypes[l.device.id] = {}
-				deviceTypes[l.device.id][l.deviceType()] = 1
-			deviceTypesList = for key, value of deviceTypes
-				device: key
-				types: value
-			logs = deviceTypesList
-
-			assign = (map, element) ->
-				#key = Object.keys(element.types).sort().join()
-				if Object.keys(element.types).length > 1
-					key = "variable"
-				else
-					key = Object.keys(element.types)[0]
-				if not map[key]
-					map[key] = {}
-				map[key][element.device] = 1
-			reduce = (value) ->
-				Object.keys(value).length
-
-		when "global-deviceTypeCombinations"
-			userDevices = {}
-			logs.forEach (l) ->
-				if l.userIdentifier
-					if not userDevices[l.userIdentifier]
-						userDevices[l.userIdentifier] = {}
-					if not userDevices[l.userIdentifier][l.device.id]
-						userDevices[l.userIdentifier][l.device.id] = {}
-					userDevices[l.userIdentifier][l.device.id][l.deviceType()] = 1
-
-			userDevicesList = for key, value of userDevices
-				user: key
-				devices: value
-
-			logs = userDevicesList
-
-			assign = (map, element) ->
-				if Object.keys(element.devices).length > 1
-					combination = for key, value of element.devices
-						#Object.keys(value).sort().join()
-						if Object.keys(value).length > 1
-							"variable"
-						else
-							Object.keys(value)[0]
-					key = combination.sort().join(";")
-					if not map[key]
-						map[key] = 1
-					else
-						map[key]++
-
-		else
-			throw new Meteor.Error "Unknown view: #{view}"
-
-	value = process logs, assign, transform, reduce
-
-	value
-###
+	log value
 
 getGranularity = (from, to, granularity) ->
 	from = moment from
