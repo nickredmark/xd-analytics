@@ -1,6 +1,7 @@
 getAggregatedValues = (appId, view, from, to, options) ->
 
 	log "get aggregated values #{appId} #{view} #{from} - #{to}"
+	log options
 
 	cache = Cache.findOne
 			appId: appId
@@ -27,15 +28,36 @@ getAggregatedValues = (appId, view, from, to, options) ->
 		aggregate.push
 			$match: match
 
+		if options.deviceCount
+			match.userIdentifier =
+				$exists: true
+				$ne: null
+			match.deviceId =
+				$exists: true
+				$ne: null
+			match.deviceCount = options.deviceCount
+
+		if options.user
+			match.userIdentifier = options.user
+
+		if options.device
+			match.deviceId = options.device
+
+		if options.location
+			match.location = options.location
+		else if options.locationPattern
+			match.location =
+				$regex: options.locationPattern
+
 		switch view
 			when "browsers-devices"
+
 				aggregate.push
 					$group:
 						_id:
 							device: "$deviceId"
 							browser: "$browser"
 							version: "$browserVersion"
-
 
 				aggregate.push
 					$group:
@@ -87,6 +109,7 @@ getAggregatedValues = (appId, view, from, to, options) ->
 								count: "$count"
 
 			when "browsers-versions"
+
 				aggregate.push
 					$group:
 						_id:
@@ -151,9 +174,10 @@ getAggregatedValues = (appId, view, from, to, options) ->
 							$sum: 1
 
 			when "deviceTypeCombinations"
-				match.userIdentifier =
-					$exists: true
-					$ne: null
+				if !match.userIdentifier
+					match.userIdentifier =
+						$exists: true
+						$ne: null
 
 				aggregate.push
 					$group:
@@ -167,10 +191,78 @@ getAggregatedValues = (appId, view, from, to, options) ->
 						count:
 							$sum: 1
 
+			when "osCombinations"
+				if !match.userIdentifier
+					match.userIdentifier =
+						$exists: true
+						$ne: null
+
+				aggregate.push
+					$group:
+						_id:
+							user: "$userIdentifier"
+							oses: "$oses"
+
+				aggregate.push
+					$group:
+						_id: "$_id.oses"
+						count:
+							$sum: 1
+
+			when "browserCombinations"
+				if !match.userIdentifier
+					match.userIdentifier =
+						$exists: true
+						$ne: null
+
+				aggregate.push
+					$group:
+						_id:
+							user: "$userIdentifier"
+							browsers: "$browsers"
+
+				aggregate.push
+					$group:
+						_id: "$_id.browsers"
+						count:
+							$sum: 1
+
+			when "locationCombinations"
+				if !match.userIdentifier
+					match.userIdentifier =
+						$exists: true
+						$ne: null
+
+				aggregate.push
+					$unwind: "$userLocations"
+
+				aggregate.push
+					$match:
+						"userLocations.1":
+							$exists: true
+
+				aggregate.push
+					$group:
+						_id:
+							user: "$userIdentifier"
+							userLocations: "$userLocations"
+
+				aggregate.push
+					$group:
+						_id: "$_id.userLocations"
+						count:
+							$sum: 1
+
 			when "deviceCombinations-users", "deviceCombinations-views"
-				match.userIdentifier =
+				match.deviceCount =
 					$exists: true
 					$ne: null
+
+				if !match.userIdentifier
+					match.userIdentifier =
+						$exists: true
+						$ne: null
+
 				if view is "deviceCombinations-views"
 					match.type =
 						$in: ["connected", "location"]
@@ -194,21 +286,12 @@ getAggregatedValues = (appId, view, from, to, options) ->
 							count:
 								$sum: 1
 
-			when "locations-views", "locations-combinedViews"
+			when "locations"
 				match.location =
 					$exists: true
 					$ne: null
 				match.type =
 					$in: ["connected", "location"]
-				if view is "locations-combinedViews"
-					match.userIdentifier =
-						$exists: true
-						$ne: null
-					match.deviceId =
-						$exists: true
-						$ne: null
-					match.deviceCount =
-						$gte: 2
 
 				aggregate.push
 					$group:
@@ -217,89 +300,71 @@ getAggregatedValues = (appId, view, from, to, options) ->
 							$sum: "$count"
 
 
-			when "users-timeOnline", "users-combinedTimeOnline"
+			when "users-timeOnline", "users-combinedTimeOnline", "users-views", "users-devices", "users-combinedDevices"
 				match.userIdentifier =
 					$exists: true
 					$ne: null
 
 				switch view
-					when "users-combinedTimeOnline"
-						match.deviceId =
-							$exists: true
-							$ne: null
-						match.deviceCount =
-							$gte: 2
-
-				aggregate.push
-					$group:
-						_id:
-							userIdentifier: "$userIdentifier"
-							interval: "$interval"
-						userTimeOnline:
-							$first: "$userTimeOnline"
-
-				aggregate.push
-					$group:
-						_id: "$_id.userIdentifier"
-						count:
-							$sum: "$userTimeOnline"
-
-			when "users-views", "users-devices", "users-combinedViews", "users-combinedDevices"
-				match.userIdentifier =
-					$exists: true
-					$ne: null
-
-				switch view
-					when "users-combinedViews", "users-combinedDevices"
-						# make sure at least 2 devices have been used at the same time
-						match.deviceId =
-							$exists: true
-							$ne: null
+					when "users-combinedDevices", "users-combinedTimeOnline"
+						if !match.deviceId
+							match.deviceId =
+								$exists: true
+								$ne: null
 						match.deviceCount =
 							$gte: 2
 					when "users-views", "users-devices"
 						match.type =
 							$in: ["connected", "location"]
 
-				group =
-					_id:
-						userIdentifier: "$userIdentifier"
-						deviceId: "$deviceId"
-
+				id = "$userIdentifier"
 				switch view
-					when "users-combinedDevices"
-						group.count =
-							$max: "$deviceCount"
-					else
-						group.count =
-							$sum: "$count"
+					when "users-timeOnline","users-combinedTimeOnline"
+						aggregate.push
+							$group:
+								_id:
+									userIdentifier: "$userIdentifier"
+									interval: "$interval"
+								userTimeOnline:
+									$first: "$userTimeOnline"
+						id = "$_id.userIdentifier"
+						count =
+							$sum: "$userTimeOnline"
 
-				aggregate.push
-					$group: group
-
-				aggregate.push
-					$sort:
-						count: -1
-
-				switch view
 					when "users-devices"
+						aggregate.push
+							$group:
+								_id:
+									userIdentifier: "$userIdentifier"
+									deviceId: "$deviceId"
+						id = "$_id.userIdentifier"
 						count =
 							$sum: 1
 					when "users-combinedDevices"
 						count =
-							$max: "$count"
+							$max: "$deviceCount"
 					else
 						count =
 							$sum: "$count"
 
 				aggregate.push
 					$group:
-						_id: "$_id.userIdentifier"
+						_id: id
 						count: count
-						devices:
-							$push:
-								id: "$_id.deviceId"
-								count: "$count"
+
+			when "devices"
+
+				match.deviceId =
+					$exists: true
+					$ne: null
+				match.type =
+					$in: ["connected", "location"]
+
+				aggregate.push
+					$group:
+						_id: "$deviceId"
+						count:
+							$sum: "$count"
 
 			else
 				throw new Meteor.Error "Unknown view: #{view}"

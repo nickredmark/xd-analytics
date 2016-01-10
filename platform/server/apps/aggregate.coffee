@@ -265,35 +265,63 @@ Meteor.computeDeviceIntervals = (min) ->
 			userIdentifier: @_id.userIdentifier
 			deviceId: @_id.deviceId
 		,
-			maxDeviceType: @value.maxDeviceType
-			events: [@]
-			logs: @value.count
 			deviceMinDate: @value.minDate
 			deviceMaxDate: @value.maxDate
-			deviceTimeOnline: @value.timeOnline
+			deviceTimeOnline: if @._id.type is "online" then 0 else @value.timeOnline
+			maxDeviceType: @value.maxDeviceType
+			eventTypes: [@._id.type]
+			locations: [@_id.location]
+			os: @_id.os
+			browser: @_id.browser
+			events: [@]
+			logs: @value.count
 	, (key, values) ->
 		deviceMinDate = new Date(100000000000000)
 		deviceMaxDate = new Date(0)
 		maxDeviceType = 0
 		events = []
 		logs = 0
+		eventTypes = {}
+		locations = []
+		os = values[0].os
+		browser = values[0].browser
+
 		for value in values
 			deviceMinDate = Math.min(deviceMinDate, value.deviceMinDate)
 			deviceMaxDate = Math.max(deviceMaxDate, value.deviceMaxDate)
 			maxDeviceType = Math.max(maxDeviceType, value.maxDeviceType)
 
+			for type in value.eventTypes
+				if !eventTypes[type]
+					eventTypes[type] = true
+
 			for event in value.events
 				events.push event
+
+			for location in value.locations
+				locations.push location
 
 			logs += value.logs
 
 		deviceMinDate = new Date(deviceMinDate)
 		deviceMaxDate = new Date(deviceMaxDate)
 
+		eventTypes = Object.keys(eventTypes).sort()
+		locations.sort()
+
+		if eventTypes.length is 1 and eventTypes[0] is "online"
+			deviceTimeOnline = 0
+		else
+			deviceTimeOnline = deviceMaxDate - deviceMinDate + 10*1000
+
 		deviceMinDate: deviceMinDate
 		deviceMaxDate: deviceMaxDate
-		deviceTimeOnline: deviceMaxDate - deviceMinDate + 10*1000
+		deviceTimeOnline: deviceTimeOnline
 		maxDeviceType: maxDeviceType
+		locations: locations
+		os: os
+		browser: browser
+		eventTypes: eventTypes
 		events: events
 		logs: logs
 	,
@@ -307,6 +335,9 @@ Meteor.computeUserIntervals = (min) ->
 
 	# Combinations for same user
 	DeviceIntervals.mapReduce ->
+		locations = []
+		for location in @value.locations
+			locations.push [location]
 		emit
 			appId: @_id.appId
 			interval: @_id.interval
@@ -316,7 +347,11 @@ Meteor.computeUserIntervals = (min) ->
 			userMaxDate: @value.deviceMaxDate
 			userTimeOnline: @value.deviceTimeOnline
 			deviceTypes: [@value.maxDeviceType]
+			locations: locations
+			oses: [@value.os]
+			browsers: [@value.browser]
 			deviceCount: 1
+			eventTypes: [@value.eventTypes]
 			events: [@]
 			logs: @value.count
 	, (key, values) ->
@@ -324,10 +359,18 @@ Meteor.computeUserIntervals = (min) ->
 		userMaxDate = new Date(0)
 		events = []
 		deviceTypes = []
+		locations = null
+		oses = []
+		browsers = []
 		logs = 0
+		eventTypes = {}
 		for value in values
 			userMinDate = Math.min(userMinDate, value.userMinDate)
 			userMaxDate = Math.max(userMaxDate, value.userMaxDate)
+
+			for type in value.eventTypes
+				if !eventTypes[type]
+					eventTypes[type] = true
 
 			for event in value.events
 				events.push event
@@ -335,16 +378,52 @@ Meteor.computeUserIntervals = (min) ->
 			for deviceType in value.deviceTypes
 				deviceTypes.push deviceType
 
+			if locations
+				nlocations = []
+				for lcomb in locations
+					for rcomb in value.locations
+						ncomb = []
+						for llocation in lcomb
+							ncomb.push llocation
+						for rlocation in rcomb
+							ncomb.push rlocation
+					ncomb.sort()
+					nlocations.push ncomb
+				locations = nlocations
+			else
+				locations = value.locations
+
+			for os in value.oses
+				oses.push os
+
+			for browser in value.browsers
+				browsers.push browser
+
 			logs += value.logs
 
 		userMinDate = new Date(userMinDate)
 		userMaxDate = new Date(userMaxDate)
 
+		eventTypes = Object.keys(eventTypes).sort()
+
+		if eventTypes.length is 1 and eventTypes[0] is "online"
+			userTimeOnline = 0
+		else
+			userTimeOnline = userMaxDate - userMinDate + 10*1000
+
+		deviceTypes.sort()
+		oses.sort()
+		browsers.sort()
+
 		userMinDate: userMinDate
 		userMaxDate: userMaxDate
-		userTimeOnline: userMaxDate - userMinDate + 10*1000
-		deviceTypes: deviceTypes.sort()
+		userTimeOnline: userTimeOnline
+		deviceTypes: deviceTypes
 		deviceCount: deviceTypes.length
+		locations: locations
+		oses: oses
+		browsers: browsers
+		eventTypes: eventTypes
 		events: events
 		logs: logs
 	,
@@ -378,10 +457,16 @@ Meteor.computeFinalIntervals = ->
 			userTimeOnline: "$value.userTimeOnline"
 			deviceTypes: "$value.deviceTypes"
 			deviceCount: "$value.deviceCount"
+			userEventTypes: "$value.eventTypes"
+			userLocations: "$value.locations"
+			oses: "$value.oses"
+			browsers: "$value.browsers"
 
 			deviceMinDate: "$value.events.value.deviceMinDate"
 			deviceMaxDate: "$value.events.value.deviceMaxDate"
 			deviceTimeOnline: "$value.events.value.deviceTimeOnline"
+			deviceEventTypes: "$value.events.value.eventTypes"
+			deviceLocations: "$value.events.value.locations"
 
 			minDate: "$value.events.value.events.value.minDate"
 			maxDate: "$value.events.value.events.value.maxDate"
