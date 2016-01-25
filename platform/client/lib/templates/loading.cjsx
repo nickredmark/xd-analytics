@@ -1,10 +1,8 @@
 Templates.Loading = React.createClass
 	render: ->
-		<div className="row">
-			<div className="col-xs-12">
-				<div className="text-center">
-					<Templates.Spinner/>
-				</div>
+		<div className="col-xs-12">
+			<div className="block text-center">
+				<Templates.Spinner/>
 			</div>
 		</div>
 

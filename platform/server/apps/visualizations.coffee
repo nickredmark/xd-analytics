@@ -28,6 +28,10 @@ getAggregatedValues = (appId, view, from, to, options) ->
 		aggregate.push
 			$match: match
 
+		sort =
+			count: -1
+
+
 		if options.deviceCount
 			match.userIdentifier =
 				$exists: true
@@ -178,6 +182,8 @@ getAggregatedValues = (appId, view, from, to, options) ->
 					match.userIdentifier =
 						$exists: true
 						$ne: null
+				match.deviceCount =
+					$gte: 2
 
 				aggregate.push
 					$group:
@@ -196,6 +202,10 @@ getAggregatedValues = (appId, view, from, to, options) ->
 					match.userIdentifier =
 						$exists: true
 						$ne: null
+				match.deviceCount =
+					$gte: 2
+				match.oses =
+						$ne: null
 
 				aggregate.push
 					$group:
@@ -213,6 +223,10 @@ getAggregatedValues = (appId, view, from, to, options) ->
 				if !match.userIdentifier
 					match.userIdentifier =
 						$exists: true
+						$ne: null
+				match.deviceCount =
+					$gte: 2
+				match.browsers =
 						$ne: null
 
 				aggregate.push
@@ -238,8 +252,18 @@ getAggregatedValues = (appId, view, from, to, options) ->
 
 				aggregate.push
 					$match:
-						"userLocations.1":
-							$exists: true
+						userLocations:
+							$ne: null
+
+				match =
+					"userLocations.1":
+						$exists: true
+
+				if options.location
+					match["userLocations"] = options.location
+
+				aggregate.push
+					$match: match
 
 				aggregate.push
 					$group:
@@ -286,40 +310,111 @@ getAggregatedValues = (appId, view, from, to, options) ->
 							count:
 								$sum: 1
 
-			when "locations"
+			when "locations-views", "locations-users", "locations-timeOnline", "locations-combinedViewsRatio"
 				match.location =
 					$exists: true
 					$ne: null
 				match.type =
 					$in: ["connected", "location"]
 
+				group =
+					_id: "$location"
+					count:
+						$sum: "$count"
+					globalCount:
+						$first: 1
+
+				switch view
+					when "locations-users"
+						if !match.userIdentifier
+							match.userIdentifier =
+								$exists: true
+								$ne: null
+						aggregate.push
+							$group:
+								_id:
+									location: "$location"
+									userIdentifier: "$userIdentifier"
+						group._id = "$_id.location"
+						group.count =
+							$sum: 1
+					when "locations-timeOnline"
+						group.count =
+							$sum: "$timeOnline"
+
+					when "locations-combinedViewsRatio"
+						delete(match.deviceCount)
+						if !match.userIdentifier
+							match.userIdentifier =
+								$exists: true
+								$ne: null
+						if !match.deviceId
+							match.deviceId =
+								$exists: true
+								$ne: null
+						aggregate.push
+							$project:
+								location: 1
+								count:
+									$cond: [
+										$gte: [
+											"$deviceCount"
+										,
+											2
+										]
+									,
+										"$count"
+									,
+										0
+									]
+								globalCount: "$count"
+						group.globalCount =
+							$sum: "$globalCount"
+
 				aggregate.push
-					$group:
-						_id: "$location"
-						count:
-							$sum: "$count"
+					$group: group
 
+				switch view
+					when "locations-combinedViewsRatio"
+						aggregate.push
+							$project:
+								_id: 1
+								count: 1
+								ratio:
+									$cond: [
+										$ne: [
+											"$globalCount"
+										,
+											0
+										]
+									,
+										$divide: [
+											"$count"
+										,
+											"$globalCount"
+										]
+									,
+										0
+									]
+						sort =
+							ratio: -1
+							count: -1
 
-			when "users-timeOnline", "users-combinedTimeOnline", "users-views", "users-devices", "users-combinedDevices"
+			when "users-timeOnline", "users-views", "users-devices", "users-combinedDevices"
 				match.userIdentifier =
 					$exists: true
 					$ne: null
 
 				switch view
-					when "users-combinedDevices", "users-combinedTimeOnline"
-						if !match.deviceId
-							match.deviceId =
-								$exists: true
-								$ne: null
-						match.deviceCount =
-							$gte: 2
 					when "users-views", "users-devices"
 						match.type =
 							$in: ["connected", "location"]
 
 				id = "$userIdentifier"
+				count =
+					$sum: "$count"
 				switch view
-					when "users-timeOnline","users-combinedTimeOnline"
+					when "users-timeOnline"
 						aggregate.push
 							$group:
 								_id:
@@ -343,9 +438,6 @@ getAggregatedValues = (appId, view, from, to, options) ->
 					when "users-combinedDevices"
 						count =
 							$max: "$deviceCount"
-					else
-						count =
-							$sum: "$count"
 
 				aggregate.push
 					$group:
@@ -370,14 +462,14 @@ getAggregatedValues = (appId, view, from, to, options) ->
 				throw new Meteor.Error "Unknown view: #{view}"
 
 		aggregate.push
-			$sort:
-				count: -1
+			$sort: sort
 
 		aggregate.push
 			$limit: options?.limit or 20
 
 		for a in aggregate
-			log a
+			log Object.keys(a)[0]
+			log a[Object.keys(a)[0]]
 
 		aggregated = Intervals.aggregate aggregate
 
@@ -430,6 +522,9 @@ computeAggregatedValue = (appId, view, from, to, options) ->
 			$gte: from
 			$lt: to
 
+	unwind = null
+	match2 = {}
+
 	aggregate.push
 		$match: match
 
@@ -446,10 +541,14 @@ computeAggregatedValue = (appId, view, from, to, options) ->
 		match.maxDeviceType = options.deviceType
 	if options.browser
 		match.browser = options.browser
+	if options.browserCombination
+		match.browsers = options.browserCombination
 	if options.browserVersion
 		match.browserVersion = options.browserVersion
 	if options.os
 		match.os = options.os
+	if options.osCombination
+		match.oses = options.osCombination
 	if options.user
 		match.userIdentifier = options.user
 	if options.device
@@ -462,6 +561,9 @@ computeAggregatedValue = (appId, view, from, to, options) ->
 			$regex: options.locationPattern
 	else if options.location
 		match.location = options.location
+
+	if options.locationCombination
+		match.userLocations = options.locationCombination
 
 	if options.deviceCount
 		if !match.userIdentifier
@@ -624,23 +726,6 @@ getBuckets = (from, to, granularity) ->
 		buckets.push moment(current)
 
 	[labels, buckets]
-
-process = (data, assign, transform, reduce) ->
-	map = {}
-
-	if data.forEach
-		data.forEach (d) ->
-			assign map, d
-	else
-		for d in data
-			assign map, d
-
-	map = transform map
-
-	for key, value of map
-		map[key] = reduce value
-
-	map
 
 Meteor.methods
 

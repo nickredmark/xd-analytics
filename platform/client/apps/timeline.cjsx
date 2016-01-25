@@ -57,12 +57,16 @@ Views.Timeline = React.createClass
 		views: "views"
 		devices: "devices"
 		versions: "versions"
+	locationViews:
+		views: "views"
+		users: "users"
+		timeOnline: "time online"
+		combinedViewsRatio: "combined views ratio"
 	userViews:
 		views: "views"
 		timeOnline: "time online"
 		devices: "devices"
-		combinedTimeOnline: "combined time online"
-		combinedDevices: "combined devices"
+		combinedDevices: "max combined devices"
 	deviceCombinationViews:
 		users: "users"
 		views: "views"
@@ -94,9 +98,12 @@ Views.Timeline = React.createClass
 		view: "logs"
 
 		views:
+			locations: "views"
 			users: "views"
 			browsers: "views"
 			deviceCombinations: "users"
+
+		filter: null
 
 		filters:
 			logType: "view"
@@ -109,6 +116,12 @@ Views.Timeline = React.createClass
 				combination = for type in value
 					@deviceTypes[type-1]
 				value = combination.join("-")
+			when "locationCombination"
+				value = value.join("-")
+			when "osCombination"
+				value = value.join("-")
+			when "browserCombination"
+				value = value.join("-")
 		value
 
 	currentSelectionLabel: ->
@@ -137,12 +150,14 @@ Views.Timeline = React.createClass
 			delete(values[label])
 			@setState
 				values: values
-			, @lineChart
+			, ->
+				if !self.state.filter
+					self.lineChart()
 		else
 			values[label] = data
 			@setState
 				values: values
-			, @wrap(@loadValueSet, label)
+			, @wrap(@loadDataset, label)
 	componentDidMount: ->
 		@timeline = document.getElementById("timeline")
 		@addDataset()
@@ -155,6 +170,10 @@ Views.Timeline = React.createClass
 		@setState set
 		, ->
 			self.loadValues name, "#{name}-#{value}"
+	loadAllValues: ->
+		log "Load all values"
+		@loadAllDatasets()
+		@loadAllFilters()
 	loadAllDatasets: ->
 		self = @
 		values = @state.values
@@ -163,9 +182,10 @@ Views.Timeline = React.createClass
 		@setState
 			values: values
 		, ->
-			self.lineChart()
+			if !self.state.filter
+				self.lineChart()
 			for label, data of self.state.values
-				self.loadValueSet label
+				self.loadDataset label
 	loadAllFilters: ->
 		@loadValues "deviceTypes"
 		@loadValues "deviceCombinations", "deviceCombinations-#{@state.views.deviceCombinations}"
@@ -174,14 +194,10 @@ Views.Timeline = React.createClass
 		@loadValues "browserCombinations"
 		@loadValues "oses"
 		@loadValues "osCombinations"
-		@loadValues "locations"
+		@loadValues "locations", "locations-#{@state.views.locations}"
 		@loadValues "locationCombinations"
 		@loadValues "users", "users-#{@state.views.users}"
 		@loadValues "devices", "devices"
-	loadAllValues: ->
-		log "Load all values"
-		@loadAllDatasets()
-		@loadAllFilters()
 	loadValues: (type, view) ->
 		if !view
 			view = type
@@ -189,10 +205,14 @@ Views.Timeline = React.createClass
 		set = {}
 		set[type] = null
 		self.setState set, ->
+			if self.state.filter is type
+				self.barChart()
 			Meteor.call 'getAggregatedValues', self.props.appId, view, self.state.from, self.state.to, self.state.filters, handleResult null, (r) ->
 				set = {}
 				set[type] = r
-				self.setState set
+				self.setState set, ->
+					if self.state.filter is type
+						self.barChart()
 	deleteValue: (label) ->
 		self = @
 		values = @state.values
@@ -200,8 +220,9 @@ Views.Timeline = React.createClass
 		@setState
 			values: values
 		, ->
-			self.lineChart()
-	loadValueSet: (label) ->
+			if !self.state.filter
+				self.lineChart()
+	loadDataset: (label) ->
 		data = @state.values[label]
 		view = data.view
 		options = data.options
@@ -215,7 +236,8 @@ Views.Timeline = React.createClass
 				self.setState
 					values: allValues
 				, ->
-					self.lineChart()
+					if !self.state.filter
+						self.lineChart()
 	addPattern: ->
 		pattern = @state.pattern
 		patterns = @state.patterns
@@ -223,6 +245,7 @@ Views.Timeline = React.createClass
 		@setState
 			patterns: patterns
 			pattern: ""
+
 	pieChart: (buckets) ->
 
 		colors = colorPairSeries Object.keys(buckets).length, 1
@@ -249,27 +272,49 @@ Views.Timeline = React.createClass
 		@chart = new Chart(ctx)
 		@currentChart = @chart.Pie values
 
-	barChart: (labels, values) ->
-		colors = colorPairSeries Object.keys(values).length, 0.5
+	toggleFilter: (filter) ->
+		self = @
+		@setState
+			filter: if @state.filter is filter then null else filter
+		, ->
+			if @state.filter
+				self.barChart()
+			else
+				self.lineChart()
+	barChart: ->
 
-		j = 0
+		labels = []
 		datasets = []
-		for key, data of values
-			i = 0
-			while i < labels.length
-				if not data[i]
-					data[i] = 0
-				i++
-			[color, lighter] = colors[j]
+
+		if @state[@state.filter]
+			data = []
+			for datum in @state[@state.filter]
+				switch @state.filter
+					when "deviceTypes"
+						label = @deviceTypes[datum._id-1]
+					when "deviceTypeCombinations"
+						types = for type in datum._id
+							@deviceTypes[type-1]
+						label = types.join(",")
+					when "locations"
+						label = cut(datum._id, 20)
+					when "locationCombinations"
+						locations = for location in datum._id
+							cut(location, 10)
+						label = locations.join(",")
+					else
+						label = cut(datum._id, 10)
+				labels.push label
+				data.push datum.count
+			[color, lighter] = colorPair 0.5
+
 			datasets.push
-				label: key
+				label: @state.filter
 				data: data
 				fillColor: lighter
 				strokeColor: color
 				highlightFill: lighter
 				highlightStroke: color
-
-			j++
 
 		if @currentChart
 			@currentChart.destroy()
@@ -338,9 +383,6 @@ Views.Timeline = React.createClass
 	render: ->
 		<div>
 			<div>
-				<div className="col-xs-12">
-					<h2>Timeline</h2>
-				</div>
 				<div className="col-xs-12 col-sm-4">
 					<Templates.DateRangeInput id="range" label="Time range" from={@state.from} to={@state.to} ranges={@ranges} onChange={@updateRange("from","to", @loadAllValues)}/>
 				</div>
@@ -369,6 +411,11 @@ Views.Timeline = React.createClass
 				</div>
 				<div className="col-xs-12 col-sm-3">
 					<h3>Data</h3>
+					{
+						if @state.filter
+							<div>{@state.filter}</div>
+							<button className="btn btn-primary" onClick={@setValue("filter", null, @lineChart)}>Back to timeline</button>
+					}
 					<h4>Current</h4>
 					{
 						if Object.keys(@state.values).length
@@ -462,7 +509,17 @@ Views.Timeline = React.createClass
 				</div>
 				<div className="col-xs-12 col-sm-3 col-lg-2">
 					<h3>Devices</h3>
-					<h4>Types</h4>
+					<h4>
+						Types
+						&nbsp;
+						<button className="btn btn-xs btn-default" onClick={@wrap(@loadValues,"deviceTypes")}>
+							<i className="fa fa-refresh"></i>
+						</button>
+						&nbsp;
+						<button className="btn btn-xs btn-default" onClick={@wrap(@toggleFilter, "deviceTypes")}>
+							<i className="fa fa-bar-chart"></i>
+						</button>
+					</h4>
 					{
 						if @state.deviceTypes
 							<ul className="activables">
@@ -478,7 +535,17 @@ Views.Timeline = React.createClass
 						else
 							<Templates.Loading/>
 					}
-					<h4>Amount</h4>
+					<h4>
+						Amount
+						&nbsp;
+						<button className="btn btn-xs btn-default" onClick={@wrap(@loadValues,"deviceCombinations","deviceCombinations-#{@state.views.deviceCombinations}")}>
+							<i className="fa fa-refresh"></i>
+						</button>
+						&nbsp;
+						<button className="btn btn-xs btn-default" onClick={@wrap(@toggleFilter, "deviceCombinations")}>
+							<i className="fa fa-bar-chart"></i>
+						</button>
+					</h4>
 					<div className="labels">
 						Sort by
 						{
@@ -504,7 +571,17 @@ Views.Timeline = React.createClass
 						else
 							<Templates.Loading/>
 					}
-					<h4>Combinations</h4>
+					<h4>
+						Combinations
+						&nbsp;
+						<button className="btn btn-xs btn-default" onClick={@wrap(@loadValues,"deviceTypeCombinations")}>
+							<i className="fa fa-refresh"></i>
+						</button>
+						&nbsp;
+						<button className="btn btn-xs btn-default" onClick={@wrap(@toggleFilter, "deviceTypeCombinations")}>
+							<i className="fa fa-bar-chart"></i>
+						</button>
+					</h4>
 					{
 						if @state.deviceTypeCombinations
 							if @state.filters.deviceTypeCombination
@@ -529,7 +606,17 @@ Views.Timeline = React.createClass
 					}
 				</div>
 				<div className="col-xs-12 col-sm-3 col-lg-2">
-					<h4>Browsers</h4>
+					<h4>
+						Browsers
+						&nbsp;
+						<button className="btn btn-xs btn-default" onClick={@wrap(@loadValues,"browsers","browsers-#{@state.views.browsers}")}>
+							<i className="fa fa-refresh"></i>
+						</button>
+						&nbsp;
+						<button className="btn btn-xs btn-default" onClick={@wrap(@toggleFilter, "browsers")}>
+							<i className="fa fa-bar-chart"></i>
+						</button>
+					</h4>
 					<div className="labels">
 						sort by
 						{
@@ -565,7 +652,17 @@ Views.Timeline = React.createClass
 						else
 							<Templates.Loading/>
 					}
-					<h4>Browser combinations</h4>
+					<h4>
+						Browser combinations
+						&nbsp;
+						<button className="btn btn-xs btn-default" onClick={@wrap(@loadValues,"browserCombinations")}>
+							<i className="fa fa-refresh"></i>
+						</button>
+						&nbsp;
+						<button className="btn btn-xs btn-default" onClick={@wrap(@toggleFilter, "browserCombinations")}>
+							<i className="fa fa-bar-chart"></i>
+						</button>
+					</h4>
 					{
 						if @state.browserCombinations
 							if @state.filters.browserCombination
@@ -584,7 +681,17 @@ Views.Timeline = React.createClass
 						else
 							<Templates.Loading/>
 					}
-					<h4>Operating systems</h4>
+					<h4>
+						Operating systems
+						&nbsp;
+						<button className="btn btn-xs btn-default" onClick={@wrap(@loadValues,"oses")}>
+							<i className="fa fa-refresh"></i>
+						</button>
+						&nbsp;
+						<button className="btn btn-xs btn-default" onClick={@wrap(@toggleFilter, "oses")}>
+							<i className="fa fa-bar-chart"></i>
+						</button>
+					</h4>
 					{
 						if @state.oses
 							<ul className="activables">
@@ -600,7 +707,17 @@ Views.Timeline = React.createClass
 						else
 							<Templates.Loading/>
 					}
-					<h4>OS combinations</h4>
+					<h4>
+						OS combinations
+						&nbsp;
+						<button className="btn btn-xs btn-default" onClick={@wrap(@loadValues,"osCombinations")}>
+							<i className="fa fa-refresh"></i>
+						</button>
+						&nbsp;
+						<button className="btn btn-xs btn-default" onClick={@wrap(@toggleFilter, "osCombinations")}>
+							<i className="fa fa-bar-chart"></i>
+						</button>
+					</h4>
 					{
 						if @state.osCombinations
 							if @state.filters.osCombination
@@ -621,7 +738,24 @@ Views.Timeline = React.createClass
 					}
 				</div>
 				<div className="col-xs-12 col-sm-3 col-lg-2">
-					<h4>Locations</h4>
+					<h4>
+						Locations
+						&nbsp;
+						<button className="btn btn-xs btn-default" onClick={@wrap(@loadValues,"locations","locations-#{@state.views.locations}")}>
+							<i className="fa fa-refresh"></i>
+						</button>
+						&nbsp;
+						<button className="btn btn-xs btn-default" onClick={@wrap(@toggleFilter, "locations")}>
+							<i className="fa fa-bar-chart"></i>
+						</button>
+					</h4>
+					<div className="labels">
+						sort by
+						{
+							for name, label of @locationViews
+								<label key={name} onClick={@wrap(@setView, "locations", name)} className={if @state.views.locations is name then "active"}>{label}</label>
+						}
+					</div>
 					<div className="form-group">
 						<div className="input-group">
 							<input type="text" className="form-control" value={@state.pattern} onChange={@updateValue('pattern')} onKeyDown={@onEnter(@addPattern)} placeholder="Add a location (pattern)"/>
@@ -648,9 +782,14 @@ Views.Timeline = React.createClass
 								{
 									for location, i in @state.locations
 										active = @state.filters.location is location._id
+										switch @state.views.locations
+											when "timeOnline"
+												count = formatInterval location.count
+											else
+												count = location.count
 										<li key={i}>
 											<a onClick={@toggleDictValue("filters", "location", location._id)} className={if  active then "active"} title={location._id}>
-												{if active then location._id else cut(location._id,25)} ({location.count} views)
+												{if active then location._id else cut(location._id,25)} ({count})
 											</a>
 										</li>
 								}
@@ -658,7 +797,17 @@ Views.Timeline = React.createClass
 						else
 							<Templates.Loading/>
 					}
-					<h4>Location combinations</h4>
+					<h4>
+						Location combinations
+						&nbsp;
+						<button className="btn btn-xs btn-default" onClick={@wrap(@loadValues,"locationCombinations")}>
+							<i className="fa fa-refresh"></i>
+						</button>
+						&nbsp;
+						<button className="btn btn-xs btn-default" onClick={@wrap(@toggleFilter, "locationCombinations")}>
+							<i className="fa fa-bar-chart"></i>
+						</button>
+					</h4>
 					{
 						if @state.locationCombinations
 							if @state.filters.locationCombination
@@ -679,7 +828,17 @@ Views.Timeline = React.createClass
 					}
 				</div>
 				<div className="col-xs-12 col-sm-3 col-lg-2">
-					<h4>Users</h4>
+					<h4>
+						Users
+						&nbsp;
+						<button className="btn btn-xs btn-default" onClick={@wrap(@loadValues,"users","users-#{@state.views.users}")}>
+							<i className="fa fa-refresh"></i>
+						</button>
+						&nbsp;
+						<button className="btn btn-xs btn-default" onClick={@wrap(@toggleFilter, "users")}>
+							<i className="fa fa-bar-chart"></i>
+						</button>
+					</h4>
 					<div className="labels">
 						sort by
 						{
@@ -710,7 +869,17 @@ Views.Timeline = React.createClass
 					}
 				</div>
 				<div className="col-xs-12 col-sm-3 col-lg-2">
-					<h4>Devices</h4>
+					<h4>
+						Devices
+						&nbsp;
+						<button className="btn btn-xs btn-default" onClick={@wrap(@loadValues,"devices")}>
+							<i className="fa fa-refresh"></i>
+						</button>
+						&nbsp;
+						<button className="btn btn-xs btn-default" onClick={@wrap(@toggleFilter, "devices")}>
+							<i className="fa fa-bar-chart"></i>
+						</button>
+					</h4>
 					{
 						if @state.devices
 							<ul className="activables">
@@ -769,7 +938,7 @@ rgba = (color, alpha) ->
 	"rgba(#{Math.floor(color[0])},#{Math.floor(color[1])},#{Math.floor(color[2])},#{alpha})"
 
 cut = (string, length) ->
-	if string.length < length
+	if !string or string.length < length
 		string
 	else
 		"#{string[0...length/2]}...#{string[-length/2..]}"

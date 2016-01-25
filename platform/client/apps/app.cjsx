@@ -44,31 +44,10 @@ Templates.App = React.createClass
 						</div>
 					</div>
 			}
-			{
-				if not @data.ready or @data.app
-					<div>
-						<div className="col-xs-12">
-							<ul className="nav nav-tabs">
-								{
-									for view, label of @views
-										<li key={view} role="presentation" className={if view is @view() then "active" else ""}><a href={@viewUrl(view)}>{label}</a></li>
-								}
-							</ul>
-						</div>
-					</div>
-			}
 			<div>
 				{
 					if @data.ready
-						switch @view()
-							when "overview"
-								<Views.Overview app={@data.app}/>
-							when "timeline"
-								<Views.Timeline appId={@props.appId}/>
-							when "devices"
-								<Views.Devices appId={@props.appId}/>
-							when "logs"
-								<Views.Logs/>
+						<Views.Timeline appId={@props.appId}/>
 					else
 						<Templates.Loading/>
 				}
