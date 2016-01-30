@@ -169,7 +169,7 @@ Views.Timeline = React.createClass
 		set.views[name] = value
 		@setState set
 		, ->
-			self.loadValues name, "#{name}-#{value}"
+			self.loadValues name
 	loadAllValues: ->
 		log "Load all values"
 		@loadAllDatasets()
@@ -188,30 +188,29 @@ Views.Timeline = React.createClass
 				self.loadDataset label
 	loadAllFilters: ->
 		@loadValues "deviceTypes"
-		@loadValues "deviceCombinations", "deviceCombinations-#{@state.views.deviceCombinations}"
+		@loadValues "deviceCombinations"
 		@loadValues "deviceTypeCombinations"
-		@loadValues "browsers", "browsers-#{@state.views.browsers}"
+		@loadValues "browsers"
 		@loadValues "browserCombinations"
 		@loadValues "oses"
 		@loadValues "osCombinations"
-		@loadValues "locations", "locations-#{@state.views.locations}"
+		@loadValues "locations"
 		@loadValues "locationCombinations"
-		@loadValues "users", "users-#{@state.views.users}"
-		@loadValues "devices", "devices"
-	loadValues: (type, view) ->
-		if !view
-			view = type
+		@loadValues "users"
+		@loadValues "devices"
+	loadValues: (view) ->
+		order = @views[view]
 		self = @
 		set = {}
-		set[type] = null
+		set[view] = null
 		self.setState set, ->
-			if self.state.filter is type
+			if self.state.filter is view
 				self.barChart()
-			Meteor.call 'getAggregatedValues', self.props.appId, view, self.state.from, self.state.to, self.state.filters, handleResult null, (r) ->
+			Meteor.call 'getAggregatedValues', self.props.appId, view, order, self.state.from, self.state.to, self.state.filters, handleResult null, (r) ->
 				set = {}
-				set[type] = r
+				set[view] = r
 				self.setState set, ->
-					if self.state.filter is type
+					if self.state.filter is view
 						self.barChart()
 	deleteValue: (label) ->
 		self = @
@@ -384,7 +383,7 @@ Views.Timeline = React.createClass
 		<div>
 			<div>
 				<div className="col-xs-12 col-sm-4">
-					<Templates.DateRangeInput id="range" label="Time range" from={@state.from} to={@state.to} ranges={@ranges} onChange={@updateRange("from","to", @loadAllValues)}/>
+					<Templates.DateRangeInput id="range" label="Time range" from={@state.from} to={@state.to} ranges={@ranges} onChange={@updateRange("from","to", @loadAllValues)} time={true}/>
 				</div>
 				<div className="col-xs-12 col-sm-4">
 					<Templates.Select id="granularity" label="Granularity" options={@granularities} value={@state.granularity} onChange={@updateValue('granularity', @loadAllDatasets)}/>
@@ -538,7 +537,7 @@ Views.Timeline = React.createClass
 					<h4>
 						Amount
 						&nbsp;
-						<button className="btn btn-xs btn-default" onClick={@wrap(@loadValues,"deviceCombinations","deviceCombinations-#{@state.views.deviceCombinations}")}>
+						<button className="btn btn-xs btn-default" onClick={@wrap(@loadValues,"deviceCombinations")}>
 							<i className="fa fa-refresh"></i>
 						</button>
 						&nbsp;
@@ -609,7 +608,7 @@ Views.Timeline = React.createClass
 					<h4>
 						Browsers
 						&nbsp;
-						<button className="btn btn-xs btn-default" onClick={@wrap(@loadValues,"browsers","browsers-#{@state.views.browsers}")}>
+						<button className="btn btn-xs btn-default" onClick={@wrap(@loadValues,"browsers")}>
 							<i className="fa fa-refresh"></i>
 						</button>
 						&nbsp;
@@ -741,7 +740,7 @@ Views.Timeline = React.createClass
 					<h4>
 						Locations
 						&nbsp;
-						<button className="btn btn-xs btn-default" onClick={@wrap(@loadValues,"locations","locations-#{@state.views.locations}")}>
+						<button className="btn btn-xs btn-default" onClick={@wrap(@loadValues,"locations")}>
 							<i className="fa fa-refresh"></i>
 						</button>
 						&nbsp;
@@ -815,10 +814,15 @@ Views.Timeline = React.createClass
 							<ul className="activables">
 								{
 									for locationCombination, i in @state.locationCombinations
-										label = locationCombination._id.join(", ")
+										combination = []
+										for loc in locationCombination._id
+											combination.push cut(loc, 12)
+										label = combination.join(", ")
+										fullLabel = locationCombination._id.join(", ")
+										active = fullLabel is activeLabel
 										<li key={i}>
-											<a className={if label is activeLabel then "active"} onClick={@toggleDictValue("filters", "locationCombination", locationCombination._id)}>
-												{label or "undefined"} ({locationCombination.count} users)
+											<a className={if active then "active"} title={fullLabel} onClick={@toggleDictValue("filters", "locationCombination", locationCombination._id)}>
+												{if active then fullLabel else label or "undefined"} ({locationCombination.count} users)
 											</a>
 										</li>
 								}
@@ -831,7 +835,7 @@ Views.Timeline = React.createClass
 					<h4>
 						Users
 						&nbsp;
-						<button className="btn btn-xs btn-default" onClick={@wrap(@loadValues,"users","users-#{@state.views.users}")}>
+						<button className="btn btn-xs btn-default" onClick={@wrap(@loadValues,"users")}>
 							<i className="fa fa-refresh"></i>
 						</button>
 						&nbsp;
@@ -900,6 +904,8 @@ Views.Timeline = React.createClass
 			</div>
 		</div>
 
+# Some utility functions
+
 colorPair = (alpha) ->
 		color = [Math.floor(Math.random()*256), Math.floor(Math.random()*256), Math.floor(Math.random()*256)]
 
@@ -938,10 +944,10 @@ rgba = (color, alpha) ->
 	"rgba(#{Math.floor(color[0])},#{Math.floor(color[1])},#{Math.floor(color[2])},#{alpha})"
 
 cut = (string, length) ->
-	if !string or string.length < length
-		string
-	else
+	if string?.length > length
 		"#{string[0...length/2]}...#{string[-length/2..]}"
+	else
+		string
 
 formatInterval = (ms) ->
 	if ms < 1000

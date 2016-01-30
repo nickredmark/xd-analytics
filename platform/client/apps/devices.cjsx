@@ -1,3 +1,5 @@
+# Deprecated
+
 Views.Devices = React.createClass
 	render: ->
 		<div className="col-xs-12">

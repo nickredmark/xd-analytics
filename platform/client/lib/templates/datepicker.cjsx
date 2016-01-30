@@ -32,7 +32,7 @@ Templates.DateRangePicker = React.createClass
 			minDate: @props.minDate
 			maxDate: @props.maxDate
 			timePicker: @props.time
-			timePickerSeconds: true
+			#timePickerSeconds: true
 			timePicker24Hour: true
 			linkedCalendars: false
 			ranges: @props.ranges or defaultRanges

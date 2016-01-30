@@ -1,7 +1,68 @@
-getAggregatedValues = (appId, view, from, to, options) ->
+filter = (match, options) ->
+	if options.logType
+		switch options.logType
+			when "view"
+				match.type =
+					$in: ["connected", "location"]
+			else
+				match.type = options.logType
 
-	log "get aggregated values #{appId} #{view} #{from} - #{to}"
+	if options.deviceType
+		match.maxDeviceType = options.deviceType
+	if options.browser
+		match.browser = options.browser
+	if options.browserCombination
+		match.browserCombination = options.browserCombination
+	if options.browserVersion
+		match.browserVersion = options.browserVersion
+	if options.os
+		match.os = options.os
+	if options.osCombination
+		match.osCombination = options.osCombination
+	if options.user
+		match.userIdentifier = options.user
+	if options.device
+		match.deviceId = options.device
+	if options.session
+		match.sessionId = options.session
+
+	if options.location
+		match.location = options.location
+	else if options.locationPattern
+		match.location =
+			$regex: options.locationPattern
+
+	if options.locationCombination
+		match.userLocations = options.locationCombination
+
+	if options.deviceTypeCombination
+		if !match.userIdentifier
+			match.userIdentifier =
+				$exists: true
+				$ne: null
+		if !match.deviceId
+			match.deviceId =
+				$exists: true
+				$ne: null
+		match.deviceTypes = options.deviceTypeCombination
+	else if options.deviceCount
+		if !match.userIdentifier
+			match.userIdentifier =
+				$exists: true
+				$ne: null
+		if !match.deviceId
+			match.deviceId =
+				$exists: true
+				$ne: null
+		match.deviceCount = options.deviceCount
+
+getAggregatedValues = (appId, view, order, from, to, options) ->
+
+	log "get aggregated values #{appId} #{view} #{order} #{from} - #{to}"
 	log options
+
+	# For caching
+	options.order = order
 
 	cache = Cache.findOne
 			appId: appId
@@ -32,112 +93,59 @@ getAggregatedValues = (appId, view, from, to, options) ->
 			count: -1
 
 
-		if options.deviceCount
-			match.userIdentifier =
-				$exists: true
-				$ne: null
-			match.deviceId =
-				$exists: true
-				$ne: null
-			match.deviceCount = options.deviceCount
+		filter match, options
 
-		if options.user
-			match.userIdentifier = options.user
-
-		if options.device
-			match.deviceId = options.device
-
-		if options.location
-			match.location = options.location
-		else if options.locationPattern
-			match.location =
-				$regex: options.locationPattern
 
 		switch view
-			when "browsers-devices"
+			when "browsers"
 
-				aggregate.push
-					$group:
-						_id:
-							device: "$deviceId"
-							browser: "$browser"
-							version: "$browserVersion"
+				switch order
+					when "views"
 
-				aggregate.push
-					$group:
-						_id:
-							browser: "$_id.browser"
-							version: "$_id.version"
-						count:
-							$sum: 1
+						match.type =
+							$in: ["connected", "location"]
 
-				aggregate.push
-					$sort:
-						count: -1
+						aggregate.push
+							$group:
+								_id:
+									browser: "$browser"
+									version: "$browserVersion"
+								count:
+									$sum: "$count"
 
-				aggregate.push
-					$group:
-						_id: "$_id.browser"
-						count:
-							$sum: "$count"
-						versions:
-							$push:
-								version: "$_id.version"
-								count: "$count"
+					else
+						aggregate.push
+							$group:
+								_id:
+									device: "$deviceId"
+									browser: "$browser"
+									version: "$browserVersion"
 
-			when "browsers-views"
+						aggregate.push
+							$group:
+								_id:
+									browser: "$_id.browser"
+									version: "$_id.version"
+								count:
+									$sum: 1
 
-				match.type =
-					$in: ["connected", "location"]
-
-				aggregate.push
-					$group:
-						_id:
-							browser: "$browser"
-							version: "$browserVersion"
-						count:
-							$sum: "$count"
 
 				aggregate.push
 					$sort:
 						count: -1
 
-				aggregate.push
-					$group:
-						_id: "$_id.browser"
-						count:
+				switch order
+					when "versions"
+						count =
+							$sum: 1
+					else
+						count =
 							$sum: "$count"
-						versions:
-							$push:
-								version: "$_id.version"
-								count: "$count"
-
-			when "browsers-versions"
-
-				aggregate.push
-					$group:
-						_id:
-							device: "$deviceId"
-							browser: "$browser"
-							version: "$browserVersion"
-
-				aggregate.push
-					$group:
-						_id:
-							browser: "$_id.browser"
-							version: "$_id.version"
-						count:
-							$sum: 1
-
-				aggregate.push
-					$sort:
-						count: -1
 
 				aggregate.push
 					$group:
 						_id: "$_id.browser"
-						count:
-							$sum: 1
+						count: count
 						versions:
 							$push:
 								version: "$_id.version"
@@ -182,8 +190,9 @@ getAggregatedValues = (appId, view, from, to, options) ->
 					match.userIdentifier =
 						$exists: true
 						$ne: null
-				match.deviceCount =
-					$gte: 2
+				if !match.deviceCount
+					match.deviceCount =
+						$gte: 2
 
 				aggregate.push
 					$group:
@@ -202,8 +211,9 @@ getAggregatedValues = (appId, view, from, to, options) ->
 					match.userIdentifier =
 						$exists: true
 						$ne: null
-				match.deviceCount =
-					$gte: 2
+				if !match.deviceCount
+					match.deviceCount =
+						$gte: 2
 				match.oses =
 						$ne: null
 
@@ -224,8 +234,9 @@ getAggregatedValues = (appId, view, from, to, options) ->
 					match.userIdentifier =
 						$exists: true
 						$ne: null
-				match.deviceCount =
-					$gte: 2
+				if !match.deviceCount
+					match.deviceCount =
+						$gte: 2
 				match.browsers =
 						$ne: null
 
@@ -255,9 +266,15 @@ getAggregatedValues = (appId, view, from, to, options) ->
 						userLocations:
 							$ne: null
 
-				match =
-					"userLocations.1":
+				match = {}
+				if options.deviceCount
+					match["userLocations.#{options.deviceCount-1}"] =
 						$exists: true
+					match["userLocations.#{options.deviceCount}"] =
+						$exists: false
+				else
+					match["userLocations.1"] =
+							$exists: true
 
 				if options.location
 					match["userLocations"] = options.location
@@ -277,7 +294,7 @@ getAggregatedValues = (appId, view, from, to, options) ->
 						count:
 							$sum: 1
 
-			when "deviceCombinations-users", "deviceCombinations-views"
+			when "deviceCombinations"
 				match.deviceCount =
 					$exists: true
 					$ne: null
@@ -287,7 +304,7 @@ getAggregatedValues = (appId, view, from, to, options) ->
 						$exists: true
 						$ne: null
 
-				if view is "deviceCombinations-views"
+				if order is "views"
 					match.type =
 						$in: ["connected", "location"]
 
@@ -310,7 +327,7 @@ getAggregatedValues = (appId, view, from, to, options) ->
 							count:
 								$sum: 1
 
-			when "locations-views", "locations-users", "locations-timeOnline", "locations-combinedViewsRatio"
+			when "locations"
 				match.location =
 					$exists: true
 					$ne: null
@@ -324,8 +341,8 @@ getAggregatedValues = (appId, view, from, to, options) ->
 					globalCount:
 						$first: 1
 
-				switch view
-					when "locations-users"
+				switch order
+					when "users"
 						if !match.userIdentifier
 							match.userIdentifier =
 								$exists: true
@@ -338,11 +355,11 @@ getAggregatedValues = (appId, view, from, to, options) ->
 						group._id = "$_id.location"
 						group.count =
 							$sum: 1
-					when "locations-timeOnline"
+					when "timeOnline"
 						group.count =
 							$sum: "$timeOnline"
 
-					when "locations-combinedViewsRatio"
+					when "combinedViewsRatio"
 						delete(match.deviceCount)
 						if !match.userIdentifier
 							match.userIdentifier =
@@ -374,8 +391,8 @@ getAggregatedValues = (appId, view, from, to, options) ->
 				aggregate.push
 					$group: group
 
-				switch view
-					when "locations-combinedViewsRatio"
+				switch order
+					when "combinedViewsRatio"
 						aggregate.push
 							$project:
 								_id: 1
@@ -400,21 +417,21 @@ getAggregatedValues = (appId, view, from, to, options) ->
 							ratio: -1
 							count: -1
 
-			when "users-timeOnline", "users-views", "users-devices", "users-combinedDevices"
+			when "users"
 				match.userIdentifier =
 					$exists: true
 					$ne: null
 
-				switch view
-					when "users-views", "users-devices"
+				switch order
+					when "views", "devices"
 						match.type =
 							$in: ["connected", "location"]
 
 				id = "$userIdentifier"
 				count =
 					$sum: "$count"
-				switch view
-					when "users-timeOnline"
+				switch order
+					when "timeOnline"
 						aggregate.push
 							$group:
 								_id:
@@ -426,7 +443,7 @@ getAggregatedValues = (appId, view, from, to, options) ->
 						count =
 							$sum: "$userTimeOnline"
 
-					when "users-devices"
+					when "devices"
 						aggregate.push
 							$group:
 								_id:
@@ -435,7 +452,7 @@ getAggregatedValues = (appId, view, from, to, options) ->
 						id = "$_id.userIdentifier"
 						count =
 							$sum: 1
-					when "users-combinedDevices"
+					when "combinedDevices"
 						count =
 							$max: "$deviceCount"
 
@@ -525,67 +542,10 @@ computeAggregatedValue = (appId, view, from, to, options) ->
 	unwind = null
 	match2 = {}
 
+	filter match, options
+
 	aggregate.push
 		$match: match
-
-	# Filters on original data
-	if options.logType
-		switch options.logType
-			when "view"
-				match.type =
-					$in: ["connected", "location"]
-			else
-				match.type = options.logType
-
-	if options.deviceType
-		match.maxDeviceType = options.deviceType
-	if options.browser
-		match.browser = options.browser
-	if options.browserCombination
-		match.browsers = options.browserCombination
-	if options.browserVersion
-		match.browserVersion = options.browserVersion
-	if options.os
-		match.os = options.os
-	if options.osCombination
-		match.oses = options.osCombination
-	if options.user
-		match.userIdentifier = options.user
-	if options.device
-		match.deviceId = options.device
-	if options.session
-		match.sessionId = options.session
-
-	if options.locationPattern
-		match.location =
-			$regex: options.locationPattern
-	else if options.location
-		match.location = options.location
-
-	if options.locationCombination
-		match.userLocations = options.locationCombination
-
-	if options.deviceCount
-		if !match.userIdentifier
-			match.userIdentifier =
-				$exists: true
-				$ne: null
-		if !match.deviceId
-			match.deviceId =
-				$exists: true
-				$ne: null
-		match.deviceCount = options.deviceCount
-	else if options.deviceTypeCombination
-		if !match.userIdentifier
-			match.userIdentifier =
-				$exists: true
-				$ne: null
-		if !match.deviceId
-			match.deviceId =
-				$exists: true
-				$ne: null
-		match.deviceTypes = options.deviceTypeCombination
-
 
 	if view isnt "logs"
 		uniqueFields = []
@@ -693,8 +653,10 @@ getGranularity = (from, to, granularity) ->
 			'week'
 		else if to.diff(from, 'hours') > 50
 			'day'
-		else
+		else if to.diff(from, 'minutes')/10 > 50
 			'hour'
+		else
+			'interval'
 	else
 		granularity
 
@@ -706,24 +668,31 @@ getBuckets = (from, to, granularity) ->
 	to = moment to
 
 	# Create buckets
-
-	if granularity is "global"
-		labels = ["#{from.format(Constants.dateFormat)} - #{to.format(Constants.dateFormat)}"]
-		buckets = [from, to]
+	log granularity
+	if granularity is "interval"
+		current = from.seconds(0).milliseconds(0)
+		current.minutes(current.minutes()-current.minutes()%10)
+		to = to.endOf("minute")
+		to.minutes(current.minutes()+(10-current.minutes()%10))
+		while current < to
+			buckets.push moment(current)
+			current.add(10, "minutes")
 	else
 		current = from.startOf(granularity)
 		to = to.endOf(granularity)
 		while current < to
 			buckets.push moment(current)
 			current.add(1, granularity)
+	log buckets
 
-		formats =
-			month: "MMMM"
-			week: "w"
-			day: "dd D"
-			hour: "H:00"
-		labels = (point.format(formats[granularity]) for point in buckets)
-		buckets.push moment(current)
+	formats =
+		month: "MMMM"
+		week: "w"
+		day: "dd D"
+		hour: "H:00"
+		interval: "H:mm"
+	labels = (point.format(formats[granularity]) for point in buckets)
+	buckets.push moment(current)
 
 	[labels, buckets]
 
