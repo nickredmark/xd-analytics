@@ -184,7 +184,13 @@ Meteor.computeDeviceIntervals = (min) ->
 				events.push event
 
 			for location in value.locations
-				locations.push location
+				found = false
+				for l in locations
+					if location is l
+						found = true
+						break
+				if not found
+					locations.push location
 
 			logs += value.logs
 
@@ -336,34 +342,34 @@ Meteor.computeFinalIntervals = ->
 			browserVersion: "$value.events.value.events._id.browserVersion"
 			os: "$value.events.value.events._id.os"
 
-			logs: "$value.logs"
-			userMinDate: "$value.userMinDate"
-			userMaxDate: "$value.userMaxDate"
+			#logs: "$value.logs"
+			#userMinDate: "$value.userMinDate"
+			#userMaxDate: "$value.userMaxDate"
 			userTimeOnline: "$value.userTimeOnline"
 			deviceTypes: "$value.deviceTypes"
 			deviceCount: "$value.deviceCount"
-			userEventTypes: "$value.eventTypes"
+			#userEventTypes: "$value.eventTypes"
 			userLocations: "$value.locations"
 			oses: "$value.oses"
 			browsers: "$value.browsers"
 
-			deviceMinDate: "$value.events.value.deviceMinDate"
-			deviceMaxDate: "$value.events.value.deviceMaxDate"
+			#deviceMinDate: "$value.events.value.deviceMinDate"
+			#deviceMaxDate: "$value.events.value.deviceMaxDate"
 			deviceTimeOnline: "$value.events.value.deviceTimeOnline"
-			deviceEventTypes: "$value.events.value.eventTypes"
-			deviceLocations: "$value.events.value.locations"
+			#deviceEventTypes: "$value.events.value.eventTypes"
+			#deviceLocations: "$value.events.value.locations"
 
-			minDate: "$value.events.value.events.value.minDate"
-			maxDate: "$value.events.value.events.value.maxDate"
+			#minDate: "$value.events.value.events.value.minDate"
+			#maxDate: "$value.events.value.events.value.maxDate"
 			timeOnline: "$value.events.value.events.value.timeOnline"
-			minWidth: "$value.events.value.events.value.minWidth"
-			maxWidth: "$value.events.value.events.value.maxWidth"
-			minHeight: "$value.events.value.events.value.minHeight"
-			maxHeight: "$value.events.value.events.value.maxHeight"
-			pixelRatio: "$value.events.value.events.value.pixelRatio"
-			minDiam: "$value.events.value.events.value.minDiam"
-			maxDiam: "$value.events.value.events.value.maxDiam"
-			minDeviceType: "$value.events.value.events.value.minDeviceType"
+			#minWidth: "$value.events.value.events.value.minWidth"
+			#maxWidth: "$value.events.value.events.value.maxWidth"
+			#minHeight: "$value.events.value.events.value.minHeight"
+			#maxHeight: "$value.events.value.events.value.maxHeight"
+			#pixelRatio: "$value.events.value.events.value.pixelRatio"
+			#minDiam: "$value.events.value.events.value.minDiam"
+			#maxDiam: "$value.events.value.events.value.maxDiam"
+			#minDeviceType: "$value.events.value.events.value.minDeviceType"
 			maxDeviceType: "$value.events.value.events.value.maxDeviceType"
 			count: "$value.events.value.events.value.count"
 	,

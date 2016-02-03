@@ -57,6 +57,7 @@ Views.Timeline = React.createClass
 		views: "views"
 		devices: "devices"
 		versions: "versions"
+		users: "users"
 	locationViews:
 		views: "views"
 		users: "users"
@@ -199,7 +200,7 @@ Views.Timeline = React.createClass
 		@loadValues "users"
 		@loadValues "devices"
 	loadValues: (view) ->
-		order = @views[view]
+		order = @state.views[view]
 		self = @
 		set = {}
 		set[view] = null

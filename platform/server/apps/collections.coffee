@@ -14,6 +14,8 @@ Cache._ensureIndex
 	from: 1
 	to: 1
 
+# Index for timeline view
 Intervals._ensureIndex
 	appId: 1
 	interval: 1
+	type: 1
