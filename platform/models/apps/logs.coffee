@@ -37,8 +37,10 @@ Schemas.DeviceState = new SimpleSchema
 	diam:
 		type: Number
 		decimal: true
+		optional: true
 	type:
 		type: String
+		optional: true
 
 Schemas.Log = new SimpleSchema
 	appId:

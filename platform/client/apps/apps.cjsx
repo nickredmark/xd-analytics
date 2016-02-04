@@ -41,7 +41,7 @@ Templates.Apps = React.createClass
 						<button type="submit" className="btn btn-primary">Create</button>
 					</form>
 				</div>
-				<div className="col-xs-12 col-md-4">
+				<div className="col-xs-12 col-md-6">
 					<h2>Your apps</h2>
 					{
 						if @data.apps
@@ -50,6 +50,7 @@ Templates.Apps = React.createClass
 									for app, i in @data.apps
 										<li key={i}>
 											<a href={"/apps/#{app._id}"}>{app.name}</a>
+											<span style={{color: "gray"}}> &mdash; ({app._id}, {app.apiKey})</span>
 										</li>
 								}
 							</ul>

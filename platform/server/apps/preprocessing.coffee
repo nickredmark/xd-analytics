@@ -37,7 +37,7 @@ Meteor.computeInitialItervals = (min) ->
 			d = @date
 
 			diam = Math.sqrt @device.width*@device.width + @device.height*@device.height
-			if true
+			if false
 				# This is an approximation based on only the width
 				width = @device.width
 				if width > 2000
