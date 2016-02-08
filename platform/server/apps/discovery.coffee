@@ -115,6 +115,10 @@ getAggregatedValues = (appId, view, order, from, to, options) ->
 									$sum: "$count"
 
 					when "users"
+						if !match.userIdentifier
+							match.userIdentifier =
+								$exists: true
+								$ne: null
 						aggregate.push
 							$group:
 								_id:
