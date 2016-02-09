@@ -893,7 +893,7 @@ Views.Timeline = React.createClass
 										active = @state.filters.device is device._id
 										<li key={device._id}>
 											<a onClick={@toggleDictValue("filters", "device", device._id)} className={if active then "active"} title={device._id}>
-												{if active then device._id else cut(device._id,20) or "undefined"} ({device.count})
+												{if active then device._id else cut(device._id,20) or "undefined"} ({device.count} views)
 											</a>
 										</li>
 								}
