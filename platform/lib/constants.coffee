@@ -5,7 +5,7 @@ if Meteor.isServer and not Meteor.settings.private
 	name: "XD-Analytics"
 	title: "XD-Analytics"
 	description: "An analytics platform for cross-device applications."
-	email: "info@example.com"
+	email: "mnicola@student.ethz.ch"
 	author:
 		name: "Nicola Marcacci Rossi"
 		email: "nicolamr@gmail.com"

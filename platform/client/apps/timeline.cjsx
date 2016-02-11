@@ -245,33 +245,6 @@ Views.Timeline = React.createClass
 		@setState
 			patterns: patterns
 			pattern: ""
-
-	pieChart: (buckets) ->
-
-		colors = colorPairSeries Object.keys(buckets).length, 1
-
-		i = 0
-		values = []
-		for label, value of buckets
-			[color, highlight] = colors[i]
-			values.push
-				value: value
-				label: label
-				color: color
-				highlight: highlight
-
-			i++
-
-		values.sort (a, b) ->
-			a.value <= b.value
-
-		if @currentChart
-			@currentChart.destroy()
-
-		ctx = @timeline.getContext("2d")
-		@chart = new Chart(ctx)
-		@currentChart = @chart.Pie values
-
 	toggleFilter: (filter) ->
 		self = @
 		@setState
