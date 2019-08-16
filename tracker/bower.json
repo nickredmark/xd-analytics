@@ -2,7 +2,7 @@
   "name": "xd-analytics",
   "version": "0.0.0",
   "authors": [
-    "Nicola Marcacci Rossi <nicolamr@gmail.com>"
+    "Nick Redmark"
   ],
   "description": "The Cross-Device Analytics Framework",
   "main": "xd-analytics.js",
